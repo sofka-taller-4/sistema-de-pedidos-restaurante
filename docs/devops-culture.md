@@ -69,9 +69,6 @@ W
 ### 1.3 Rol: QA (Quality Assurance)
 
 **Responsabilidades**:
-- Definir criterios de aceptación claros y medibles.
-- Diseñar estrategias de prueba automatizadas.
-- Validar riesgos funcionales y no funcionales.
 - Validar que el código cumple con Quality Gates
 - Ejecutar análisis estático con SonarCloud
 - Reportar code smells y vulnerabilidades
@@ -124,7 +121,6 @@ W
 1. Comunicar cambios en `#ops-team`
 2. Documentar  las operaciones
 3. Notificar a Dev sobre impacto
-4. Ejecutar cambios en horario acordado
 
 **Cuando QA identifica problemas**:
 1. Crear GitHub Issue con detalles
@@ -271,13 +267,13 @@ W
 
 ### 6.1 Métricas de Desarrollo
 
-- **Cobertura de pruebas**: ≥ 80%
-- **Ciclos TDD completados**: 100% de features
+- **Cobertura de pruebas**: ≥ 70%
+- **Ciclos TDD completados**: 100% de una funcionalidad por desarrollar 
 - **Commits etiquetados**: [RED], [GREEN], [REFACTOR]
 
 ### 6.2 Métricas de Operaciones
 
-- **Tiempo de despliegue**: < 5 minutos
+- **Tiempo de despliegue**: < 15 minutos
 - **Disponibilidad del sistema**: > 99.5%
 - **Tiempo de recuperación ante fallos**: < 5 minutos
 
@@ -312,20 +308,25 @@ W
 
 ---
 
-## 8. Revisión y Actualización
+## 8. Revisión y Actualización (Mejora Continua)
 
-Este Manifiesto será revisado:
-- **Mensualmente**: En reunión de retrospectiva
-- **Cuando sea necesario**: Si hay cambios significativos en el equipo o procesos
+Este Manifiesto será revisado **Cuando sea necesario**: 
+- Si hay cambios significativos en el equipo o procesos
+- Ajustar prácticas
+- Incorporar aprendizajes
+- Mejorar la colaboración entre roles
 
-**Última actualización**: Taller 4 - Semana 1
-**Próxima revisión**: Fin de mes
+
+**El  objetivo no es solo entregar software funcional, sino software confiable, entendible y sostenible.**
+
+**Última actualización**: 19/12/2025
 
 ---
 
 **Firmado por**:
-- Equipo de Desarrollo
-- Equipo de Operaciones
-- Equipo de QA
+- Equipo de Desarrollo --> Equipo 1: Cultura DevOps & Artesanía del Código (The Core)
+- Equipo de Operaciones --> Equipo 2: Arquitectura de Flujo & Automatización (The Pipeline)
+- Equipo de QA --> Equipo 3: Guardianes de la Calidad & Auditoría (The Gate)
 
-**Fecha**: [Fecha actual]
+
+**Fecha**: 19/12/2025
