@@ -12,7 +12,7 @@ export interface User {
 }
 
 export interface Product {
-  _id?: string;
+  _id: string;
   id?: number; // optional numeric short id
   name: string;
   price: number;
