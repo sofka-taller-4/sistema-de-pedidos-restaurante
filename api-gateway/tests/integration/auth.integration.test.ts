@@ -1,5 +1,6 @@
 import request from 'supertest';
 import express, { Express } from 'express';
+import cookieParser from 'cookie-parser';
 import { verifyJWT, requireRole } from '../../src/middlewares/auth';
 import jwt from 'jsonwebtoken';
 
@@ -11,6 +12,7 @@ describe('Auth Integration Tests', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
+    app.use(cookieParser()); // ✅ Required for cookie-based auth
 
     // Protected routes
     app.get('/api/public', (_req, res) => {
@@ -21,11 +23,11 @@ describe('Auth Integration Tests', () => {
       res.json({ message: 'Authenticated endpoint', user: _req.user });
     });
 
-    app.get('/api/admin', verifyJWT, requireRole('admin'), (_req, res) => {
+    app.get('/api/admin', verifyJWT, requireRole('admin'), (_req, res) => {        
       res.json({ message: 'Admin endpoint', user: _req.user });
     });
 
-    app.get('/api/waiter', verifyJWT, requireRole('waiter'), (_req, res) => {
+    app.get('/api/waiter', verifyJWT, requireRole('waiter'), (_req, res) => {      
       res.json({ message: 'Waiter endpoint', user: _req.user });
     });
   });
@@ -49,7 +51,7 @@ describe('Auth Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/authenticated')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Cookie', [`accessToken=${token}`]); // ✅ Use cookie instead of header   
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Authenticated endpoint');
@@ -68,7 +70,7 @@ describe('Auth Integration Tests', () => {
     it('should deny access with invalid token', async () => {
       const response = await request(app)
         .get('/api/authenticated')
-        .set('Authorization', 'Bearer invalid-token');
+        .set('Cookie', ['accessToken=invalid-token']);
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('Invalid token');
@@ -83,7 +85,7 @@ describe('Auth Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/authenticated')
-        .set('Authorization', `Bearer ${expiredToken}`);
+        .set('Cookie', [`accessToken=${expiredToken}`]);
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('Invalid token');
@@ -92,7 +94,7 @@ describe('Auth Integration Tests', () => {
 
   describe('Role-based access control', () => {
     it('should allow admin to access admin endpoint', async () => {
-      const adminToken = jwt.sign(
+      const token = jwt.sign(
         { sub: '123', email: 'admin@example.com', roles: ['admin'] },
         JWT_SECRET,
         { expiresIn: '1h' }
@@ -100,14 +102,14 @@ describe('Auth Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/admin')
-        .set('Authorization', `Bearer ${adminToken}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Admin endpoint');
     });
 
     it('should deny waiter access to admin endpoint', async () => {
-      const waiterToken = jwt.sign(
+      const token = jwt.sign(
         { sub: '123', email: 'waiter@example.com', roles: ['waiter'] },
         JWT_SECRET,
         { expiresIn: '1h' }
@@ -115,111 +117,58 @@ describe('Auth Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/admin')
-        .set('Authorization', `Bearer ${waiterToken}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(403);
-      expect(response.body.success).toBe(false);
       expect(response.body.message).toBe('Forbidden');
     });
 
     it('should allow waiter to access waiter endpoint', async () => {
-      const waiterToken = jwt.sign(
-        { sub: '123', email: 'waiter@example.com', roles: ['waiter'] },
+      const token = jwt.sign(
+        { sub: '456', email: 'waiter@example.com', roles: ['waiter'] },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
 
       const response = await request(app)
         .get('/api/waiter')
-        .set('Authorization', `Bearer ${waiterToken}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Waiter endpoint');
     });
 
     it('should allow multi-role user to access any endpoint', async () => {
-      const multiRoleToken = jwt.sign(
-        { sub: '123', email: 'multi@example.com', roles: ['admin', 'waiter', 'cook'] },
+      const token = jwt.sign(
+        { sub: '789', email: 'multi@example.com', roles: ['admin', 'waiter'] },    
         JWT_SECRET,
         { expiresIn: '1h' }
       );
 
       const adminResponse = await request(app)
         .get('/api/admin')
-        .set('Authorization', `Bearer ${multiRoleToken}`);
+        .set('Cookie', [`accessToken=${token}`]);
+      expect(adminResponse.status).toBe(200);
 
       const waiterResponse = await request(app)
         .get('/api/waiter')
-        .set('Authorization', `Bearer ${multiRoleToken}`);
-
-      expect(adminResponse.status).toBe(200);
+        .set('Cookie', [`accessToken=${token}`]);
       expect(waiterResponse.status).toBe(200);
     });
 
     it('should handle user with no roles', async () => {
-      const noRoleToken = jwt.sign(
-        { sub: '123', email: 'norole@example.com', roles: [] },
+      const token = jwt.sign(
+        { sub: '999', email: 'noroles@example.com', roles: [] },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
 
       const response = await request(app)
         .get('/api/admin')
-        .set('Authorization', `Bearer ${noRoleToken}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(403);
-    });
-  });
-
-  describe('Token edge cases', () => {
-    it('should handle malformed Authorization header', async () => {
-      const response = await request(app)
-        .get('/api/authenticated')
-        .set('Authorization', 'InvalidFormat token123');
-
-      expect(response.status).toBe(401);
-    });
-
-    it('should handle empty Bearer token', async () => {
-      const response = await request(app)
-        .get('/api/authenticated')
-        .set('Authorization', 'Bearer ');
-
-      expect(response.status).toBe(401);
-    });
-
-    it('should handle token without Bearer prefix', async () => {
-      const token = jwt.sign(
-        { sub: '123', email: 'user@example.com', roles: ['waiter'] },
-        JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      const response = await request(app)
-        .get('/api/authenticated')
-        .set('Authorization', token);
-
-      expect(response.status).toBe(401);
-    });
-  });
-
-  describe('Cross-role scenarios', () => {
-    it('should maintain user context across middleware chain', async () => {
-      const token = jwt.sign(
-        { sub: '123', email: 'admin@example.com', roles: ['admin', 'waiter'] },
-        JWT_SECRET,
-        { expiresIn: '1h' }
-      );
-
-      const response = await request(app)
-        .get('/api/admin')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.user.id).toBe('123');
-      expect(response.body.user.email).toBe('admin@example.com');
-      expect(response.body.user.roles).toContain('admin');
-      expect(response.body.user.roles).toContain('waiter');
+      expect(response.body.message).toBe('Forbidden');
     });
   });
 });

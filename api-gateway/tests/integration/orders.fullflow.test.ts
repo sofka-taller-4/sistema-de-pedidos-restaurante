@@ -1,6 +1,7 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import { OrdersController } from '../../src/controllers/OrdersController';
+import cookieParser from 'cookie-parser';
 import { OrdersProxyService } from '../../src/services/OrdersProxyService';
 import { verifyJWT } from '../../src/middlewares/auth';
 import { errorHandler } from '../../src/middlewares/errorHandler';
@@ -18,6 +19,7 @@ describe('Orders Full Flow Integration Tests', () => {
   beforeEach(() => {
     app = express();
     app.use(express.json());
+    app.use(cookieParser());
 
     mockProxyService = new OrdersProxyService() as jest.Mocked<OrdersProxyService>;
     const ordersController = new OrdersController(mockProxyService);
@@ -52,7 +54,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const createResponse = await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .send({
           items: [{ productId: 1, quantity: 2 }],
           tableNumber: 5,
@@ -69,7 +71,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const getResponse = await request(app)
         .get(`/api/orders/${orderId}`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(getResponse.status).toBe(200);
       expect(getResponse.body.success).toBe(true);
@@ -82,7 +84,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const updateResponse = await request(app)
         .put(`/api/orders/${orderId}`)
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .send({ status: 'preparing' });
 
       expect(updateResponse.status).toBe(200);
@@ -99,7 +101,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .send({ items: [], tableNumber: 1 });
 
       expect(response.status).toBe(503);
@@ -117,7 +119,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/orders/123')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(504);
       expect(response.body.success).toBe(false);
@@ -135,7 +137,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .get('/api/orders/nonexistent')
-        .set('Authorization', `Bearer ${token}`);
+        .set('Cookie', [`accessToken=${token}`]);
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
@@ -153,7 +155,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .send({ invalid: 'data' });
 
       expect(response.status).toBe(400);
@@ -175,7 +177,7 @@ describe('Orders Full Flow Integration Tests', () => {
     it('should reject requests with invalid token', async () => {
       const response = await request(app)
         .post('/api/orders')
-        .set('Authorization', 'Bearer invalid-token')
+        .set('Cookie', ['accessToken=invalid-token'])
         .send({ items: [], tableNumber: 1 });
 
       expect(response.status).toBe(401);
@@ -191,7 +193,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${expiredToken}`)
+        .set('Cookie', [`accessToken=${expiredToken}`])
         .send({ items: [], tableNumber: 1 });
 
       expect(response.status).toBe(401);
@@ -208,7 +210,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .set('X-Custom-Header', 'test-value')
         .send({ items: [] });
 
@@ -217,7 +219,7 @@ describe('Orders Full Flow Integration Tests', () => {
         'POST',
         { items: [] },
         expect.objectContaining({
-          authorization: `Bearer ${token}`,
+          cookie: `accessToken=${token}`,
           'x-custom-header': 'test-value',
         })
       );
@@ -240,7 +242,7 @@ describe('Orders Full Flow Integration Tests', () => {
 
       const response = await request(app)
         .post('/api/orders')
-        .set('Authorization', `Bearer ${token}`)
+        .set('Cookie', [`accessToken=${token}`])
         .send({ items: [{ productId: 1, quantity: 2 }] });
 
       expect(response.body.success).toBe(true);
@@ -259,7 +261,7 @@ describe('Orders Full Flow Integration Tests', () => {
       const requests = Array.from({ length: 5 }, (_, i) =>
         request(app)
           .post('/api/orders')
-          .set('Authorization', `Bearer ${token}`)
+          .set('Cookie', [`accessToken=${token}`])
           .send({ items: [], tableNumber: i })
       );
 

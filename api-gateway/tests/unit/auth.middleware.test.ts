@@ -11,7 +11,7 @@ describe('Auth Middleware - Unit Tests', () => {
 
   beforeEach(() => {
     mockReq = {
-      headers: {},
+      cookies: {},
     };
     mockRes = {
       status: jest.fn().mockReturnThis(),
@@ -21,7 +21,9 @@ describe('Auth Middleware - Unit Tests', () => {
   });
 
   describe('verifyJWT', () => {
-    it('should return 401 when no authorization header is present', () => {
+    it('should return 401 when no cookie is present', () => {
+      mockReq.cookies = {};
+
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
@@ -32,8 +34,8 @@ describe('Auth Middleware - Unit Tests', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should return 401 when authorization header does not start with Bearer', () => {
-      mockReq.headers = { authorization: 'Basic xyz123' };
+    it('should return 401 when cookies object is undefined', () => {
+      mockReq.cookies = undefined;
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
@@ -42,7 +44,7 @@ describe('Auth Middleware - Unit Tests', () => {
     });
 
     it('should return 401 when token is invalid', () => {
-      mockReq.headers = { authorization: 'Bearer invalid-token' };
+      mockReq.cookies = { accessToken: 'invalid-token' };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
@@ -60,7 +62,7 @@ describe('Auth Middleware - Unit Tests', () => {
         JWT_SECRET,
         { expiresIn: '-1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${expiredToken}` };
+      mockReq.cookies = { accessToken: expiredToken };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
@@ -78,7 +80,7 @@ describe('Auth Middleware - Unit Tests', () => {
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${validToken}` };
+      mockReq.cookies = { accessToken: validToken };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
@@ -90,8 +92,8 @@ describe('Auth Middleware - Unit Tests', () => {
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
-    it('should handle empty Bearer token', () => {
-      mockReq.headers = { authorization: 'Bearer ' };
+    it('should handle empty accessToken cookie', () => {
+      mockReq.cookies = { accessToken: '' };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
@@ -101,29 +103,31 @@ describe('Auth Middleware - Unit Tests', () => {
 
     it('should set empty roles array when roles not in token', () => {
       const tokenWithoutRoles = jwt.sign(
-        { sub: '123', email: 'test@example.com' },
+        { sub: '456', email: 'noroles@example.com' },
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${tokenWithoutRoles}` };
+      mockReq.cookies = { accessToken: tokenWithoutRoles };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
+      expect(mockReq.user).toBeDefined();
       expect(mockReq.user?.roles).toEqual([]);
       expect(mockNext).toHaveBeenCalled();
     });
 
     it('should handle multiple roles in token', () => {
       const multiRoleToken = jwt.sign(
-        { sub: '123', email: 'test@example.com', roles: ['admin', 'waiter', 'cook'] },
+        { sub: '789', email: 'multi@example.com', roles: ['admin', 'waiter'] },     
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${multiRoleToken}` };
+      mockReq.cookies = { accessToken: multiRoleToken };
 
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockReq.user?.roles).toEqual(['admin', 'waiter', 'cook']);
+      expect(mockReq.user).toBeDefined();
+      expect(mockReq.user?.roles).toEqual(['admin', 'waiter']);
       expect(mockNext).toHaveBeenCalled();
     });
   });
@@ -131,6 +135,7 @@ describe('Auth Middleware - Unit Tests', () => {
   describe('requireRole', () => {
     it('should return 401 when req.user is not set', () => {
       const middleware = requireRole('admin');
+      mockReq.user = undefined;
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -142,9 +147,13 @@ describe('Auth Middleware - Unit Tests', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should return 403 when user does not have required role', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: ['waiter'] };
+    it('should return 403 when user lacks required role', () => {
       const middleware = requireRole('admin');
+      mockReq.user = {
+        id: '123',
+        email: 'test@example.com',
+        roles: ['waiter'],
+      };
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -157,8 +166,12 @@ describe('Auth Middleware - Unit Tests', () => {
     });
 
     it('should call next() when user has required role', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: ['admin'] };
       const middleware = requireRole('admin');
+      mockReq.user = {
+        id: '123',
+        email: 'test@example.com',
+        roles: ['admin'],
+      };
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -166,37 +179,26 @@ describe('Auth Middleware - Unit Tests', () => {
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
-    it('should allow access when user has multiple roles including required one', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: ['waiter', 'admin', 'cook'] };
-      const middleware = requireRole('admin');
-
-      middleware(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      expect(mockRes.status).not.toHaveBeenCalled();
-    });
-
-    it('should work for waiter role', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: ['waiter'] };
+    it('should work with multiple roles', () => {
       const middleware = requireRole('waiter');
+      mockReq.user = {
+        id: '123',
+        email: 'test@example.com',
+        roles: ['admin', 'waiter'],
+      };
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it('should work for cook role', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: ['cook'] };
-      const middleware = requireRole('cook');
-
-      middleware(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-    });
-
-    it('should deny access when user has no roles', () => {
-      mockReq.user = { id: '123', email: 'test@example.com', roles: [] };
+    it('should handle empty roles array', () => {
       const middleware = requireRole('admin');
+      mockReq.user = {
+        id: '123',
+        email: 'test@example.com',
+        roles: [],
+      };
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -212,17 +214,20 @@ describe('Auth Middleware - Unit Tests', () => {
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${validToken}` };
+      mockReq.cookies = { accessToken: validToken };
 
       // First middleware: verifyJWT
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalled();
+      expect(mockReq.user).toBeDefined();
+
+      // Reset mockNext
+      mockNext.mockClear();
 
       // Second middleware: requireRole
       const roleMiddleware = requireRole('admin');
-      const mockNext2 = jest.fn();
-      roleMiddleware(mockReq as Request, mockRes as Response, mockNext2);
-      expect(mockNext2).toHaveBeenCalled();
+      roleMiddleware(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockNext).toHaveBeenCalled();
     });
 
     it('should fail at requireRole when user lacks permission', () => {
@@ -231,18 +236,23 @@ describe('Auth Middleware - Unit Tests', () => {
         JWT_SECRET,
         { expiresIn: '1h' }
       );
-      mockReq.headers = { authorization: `Bearer ${validToken}` };
+      mockReq.cookies = { accessToken: validToken };
 
       // First middleware: verifyJWT
       verifyJWT(mockReq as Request, mockRes as Response, mockNext);
       expect(mockNext).toHaveBeenCalled();
 
-      // Second middleware: requireRole (admin)
+      // Reset mocks
+      mockNext.mockClear();
+      (mockRes.status as jest.Mock).mockClear();
+      (mockRes.json as jest.Mock).mockClear();
+
+      // Second middleware: requireRole
       const roleMiddleware = requireRole('admin');
-      const mockNext2 = jest.fn();
-      roleMiddleware(mockReq as Request, mockRes as Response, mockNext2);
+      roleMiddleware(mockReq as Request, mockRes as Response, mockNext);
+
       expect(mockRes.status).toHaveBeenCalledWith(403);
-      expect(mockNext2).not.toHaveBeenCalled();
+      expect(mockNext).not.toHaveBeenCalled();
     });
   });
 });
