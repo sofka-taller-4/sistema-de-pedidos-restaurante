@@ -1,0 +1,124 @@
+name: Build
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: SonarQube Analysis with Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      
+      # =================================================================
+      # SETUP NODE.JS FOR JAVASCRIPT/TYPESCRIPT SERVICES
+      # =================================================================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: |
+            orders-producer-frontend/package-lock.json
+            api-gateway/package-lock.json
+            orders-producer-node/package-lock.json
+      
+      # =================================================================
+      # TEST & COVERAGE: FRONTEND (React + TypeScript + Vitest)
+      # =================================================================
+      - name: Install dependencies - Frontend
+        working-directory: ./orders-producer-frontend
+        run: npm ci
+      
+      - name: Run tests and generate coverage - Frontend
+        working-directory: ./orders-producer-frontend
+        run: npm run test:coverage
+      
+      # =================================================================
+      # TEST & COVERAGE: API GATEWAY (Node + TypeScript + Jest)
+      # =================================================================
+      - name: Install dependencies - API Gateway
+        working-directory: ./api-gateway
+        run: npm ci
+      
+      - name: Run tests and generate coverage - API Gateway
+        working-directory: ./api-gateway
+        run: npm run test:coverage
+      
+      # =================================================================
+      # TEST & COVERAGE: ORDERS PRODUCER NODE (Node + TypeScript + Jest)
+      # =================================================================
+      - name: Install dependencies - Orders Producer Node
+        working-directory: ./orders-producer-node
+        run: npm ci
+      
+      - name: Run tests and generate coverage - Orders Producer Node
+        working-directory: ./orders-producer-node
+        run: npm run test:coverage
+      
+      # =================================================================
+      # SETUP PYTHON FOR PYTHON SERVICE
+      # =================================================================
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: orders-producer-python/requirements.txt
+      
+      # =================================================================
+      # TEST & COVERAGE: ORDERS PRODUCER PYTHON (FastAPI + pytest)
+      # =================================================================
+      - name: Install dependencies - Orders Producer Python
+        working-directory: ./orders-producer-python
+        run: pip install -r requirements.txt
+      
+      - name: Run tests and generate coverage - Orders Producer Python
+        working-directory: ./orders-producer-python
+        run: pytest
+      
+      # =================================================================
+      # VERIFY COVERAGE REPORTS GENERATED
+      # =================================================================
+      - name: Verify coverage reports
+        run: |
+          echo "Checking coverage reports..."
+          ls -la orders-producer-frontend/coverage/lcov.info || echo "⚠️  Frontend coverage not found"
+          ls -la api-gateway/coverage/lcov.info || echo "⚠️  API Gateway coverage not found"
+          ls -la orders-producer-node/coverage/lcov.info || echo "⚠️  Orders Node coverage not found"
+          ls -la orders-producer-python/coverage.xml || echo "⚠️  Python coverage not found"
+          echo "Coverage reports check completed"
+      
+      # =================================================================
+      # SONARQUBE SCAN (with coverage reports)
+      # =================================================================
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      
+      # =================================================================
+      # OPTIONAL: UPLOAD COVERAGE ARTIFACTS
+      # =================================================================
+      - name: Upload coverage reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            orders-producer-frontend/coverage/
+            api-gateway/coverage/
+            orders-producer-node/coverage/
+            orders-producer-python/coverage.xml
+            orders-producer-python/htmlcov/
+          retention-days: 30

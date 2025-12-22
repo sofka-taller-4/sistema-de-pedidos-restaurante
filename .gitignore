@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Coverage reports (generated during tests, uploaded to SonarQube)
+coverage/
+.coverage
+htmlcov/
+*.lcov
+coverage.xml
+.nyc_output/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.test
+
+# Logs
+*.log
+logs/
+
+# SonarQube
+.sonar/
+.scannerwork/
+
+# Test artifacts
+.pytest_cache/
+.vitest/
+jest_html_reporters/
+
+# Docker
+docker-compose.override.yml

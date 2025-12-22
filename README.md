@@ -276,7 +276,72 @@ El archivo `QA_REQUERIMIENTOS.md` documenta:
 - Pruebas de seguridad (validación de entrada, CORS).
 - Pruebas de rendimiento (tiempos de carga y de procesamiento).
 - Checklist de aprobación antes de ir a producción.
+
 Se recomienda revisar ese archivo para entender en detalle todos los criterios de aceptación y casos de pru contemplados.
+
+### 12.1. Tests y Coverage para SonarQube
+
+El proyecto está completamente configurado para generar reportes de cobertura de código compatibles con SonarQube:
+
+**🔧 Configuración implementada:**
+- ✅ Frontend (React + Vitest): Genera reportes LCOV
+- ✅ API Gateway (Node + Jest): Genera reportes LCOV
+- ✅ Orders Producer Node (Node + Jest): Genera reportes LCOV
+- ✅ Orders Producer Python (FastAPI + pytest): Genera reportes Cobertura XML
+
+**📊 Ejecutar todos los tests y generar coverage:**
+
+En Windows:
+```bash
+run-tests-coverage.bat
+```
+
+En Linux/Mac:
+```bash
+./run-tests-coverage.sh
+```
+
+O ejecutar tests por servicio individual:
+```bash
+# Frontend
+cd orders-producer-frontend && npm run test:coverage
+
+# API Gateway
+cd api-gateway && npm run test:coverage
+
+# Orders Producer Node
+cd orders-producer-node && npm run test:coverage
+
+# Orders Producer Python
+cd orders-producer-python && pytest
+```
+
+**📝 Análisis de SonarQube:**
+```bash
+sonar-scanner \
+  -Dsonar.projectKey=sistema-pedidos-restaurante \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.login=YOUR_SONAR_TOKEN
+```
+
+Para más detalles sobre la configuración de coverage, consulta [SONARQUBE_COVERAGE.md](./SONARQUBE_COVERAGE.md).
+
+### 12.2. CI/CD
+
+El proyecto soporta dos plataformas de CI/CD:
+
+**GitHub Actions** (Principal):
+- Tests automáticos en cada push/PR
+- Análisis de SonarQube con coverage
+- Ver: `.github/workflows/build.yml`
+
+**Google Cloud Build** (Alternativo):
+- Build y deploy de imágenes Docker
+- Despliegue a Cloud Run
+- Ver: `cloudbuild.yaml`
+
+Para más detalles, consulta [CI_CD_README.md](./CI_CD_README.md).
+
 ## 13. Problemas comunes y soluciones
 - **El frontend no puede llamar al backend Python**
  - Verifica que `VITE_API_URL` apunte al host correcto (en Docker, al nombre del servicio; en local, a `locahost:8000`).

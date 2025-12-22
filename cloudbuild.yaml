@@ -1,6 +1,11 @@
 # Reemplaza 'mi-bucket-logs-builds' por el nombre real de tu bucket de logs
 logsBucket: gs://mi-bucket-logs-builds
 
+# ===============================================================================
+# NOTA: Este archivo es para Google Cloud Build
+# Para GitHub Actions, ver: .github/workflows/build.yml
+# ===============================================================================
+
 # Cloud Build pipeline for SistemaDePedidosRestaurante
 # Construye y sube imágenes de todos los servicios, luego despliega a Cloud Run
 
@@ -15,6 +20,68 @@ substitutions:
   REPO_NAME: "${REPO_NAME}"
 
 steps:
+  # ===================================================================
+  # TESTS & COVERAGE GENERATION FOR SONARQUBE
+  # ===================================================================
+  
+  # Test and coverage for orders-producer-frontend (React + TypeScript)
+  - name: 'node:18'
+    dir: 'orders-producer-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm ci
+        npm run test:coverage
+    id: 'test-frontend'
+
+  # Test and coverage for api-gateway (Node + TypeScript)
+  - name: 'node:18'
+    dir: 'api-gateway'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm ci
+        npm run test:coverage
+    id: 'test-api-gateway'
+
+  # Test and coverage for orders-producer-node (Node + TypeScript)
+  - name: 'node:18'
+    dir: 'orders-producer-node'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm ci
+        npm run test:coverage
+    id: 'test-orders-node'
+
+  # Test and coverage for orders-producer-python (FastAPI + Python)
+  - name: 'python:3.11'
+    dir: 'orders-producer-python'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install -r requirements.txt
+        pytest
+    id: 'test-orders-python'
+
+  # SonarQube Analysis (requires coverage reports from previous steps)
+  - name: 'sonarsource/sonar-scanner-cli:latest'
+    args:
+      - '-Dsonar.projectKey=${_SONAR_PROJECT_KEY}'
+      - '-Dsonar.sources=.'
+      - '-Dsonar.host.url=${_SONAR_HOST_URL}'
+      - '-Dsonar.login=${_SONAR_TOKEN}'
+    id: 'sonarqube-analysis'
+    waitFor: ['test-frontend', 'test-api-gateway', 'test-orders-node', 'test-orders-python']
+
+  # ===================================================================
+  # BUILD & PUSH DOCKER IMAGES
+  # ===================================================================
+
   # Build and push admin-service
   - name: 'gcr.io/cloud-builders/docker'
     args: [ 'build', '-f', 'admin-service/Dockerfile', '-t', '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/admin-service:$SHORT_SHA', 'admin-service' ]

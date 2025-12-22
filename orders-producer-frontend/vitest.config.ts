@@ -11,7 +11,7 @@ export default defineConfig({
     css: true,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'json'],
+      reporter: ['text', 'html', 'json', 'lcov'], // Added lcov for SonarQube
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/test/**',
@@ -19,6 +19,7 @@ export default defineConfig({
         'src/main.tsx',
         'src/vite-env.d.ts',
       ],
+      reportsDirectory: './coverage',
     },
   },
   resolve: {
