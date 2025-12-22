@@ -15,7 +15,7 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
   // Try to get token from Authorization header first, then from cookies
   let token = req.cookies?.accessToken;
   
-  if (!token && req.headers.authorization) {
+  if (!token && req.headers && req.headers.authorization) {
     const authHeader = req.headers.authorization;
     if (authHeader.startsWith('Bearer ')) {
       token = authHeader.slice(7);
