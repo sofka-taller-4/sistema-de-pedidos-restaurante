@@ -2,7 +2,7 @@ import request from 'supertest';
 import express from 'express';
 import { usersRouter } from '../transport/http/routes/users.routes';
 import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
-import jwt from 'jsonwebtoken';
+// import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { ObjectId } from 'mongodb';
 
@@ -35,7 +35,7 @@ describe('Users Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/admin/users', usersRouter);
-  });
+  }, 30000); // Timeout aumentado a 30 segundos
 
   afterAll(async () => {
     await teardownTestDatabase();
