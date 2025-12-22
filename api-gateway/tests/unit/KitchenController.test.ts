@@ -111,6 +111,17 @@ describe('KitchenController - Unit Tests', () => {
   });
 
   describe('updateOrder', () => {
-    // Test cases will be added here
+    it('should handle service unavailable error with 503', async () => {
+      mockReq.params = { id: '123' };
+      mockReq.body = { status: 'ready' };
+
+      const error = new Error('Service unavailable');
+      (error as any).response = { status: 503 };
+      mockProxyService.forward = jest.fn().mockRejectedValue(error);
+
+      await controller.updateOrder(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
   });
 });
