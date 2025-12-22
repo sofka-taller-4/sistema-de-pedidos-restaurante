@@ -20,19 +20,22 @@ describe('Auth Middleware - Unit Tests', () => {
     mockNext = jest.fn();
   });
 
-  describe('verifyJWT', () => {
-    it('should return 401 when no cookie is present', () => {
-      mockReq.cookies = {};
+ describe('verifyJWT', () => {
+  it('should return 401 when no cookie is present', () => {
+    // Mock request sin cookies ni header Authorization
+    const req: any = { cookies: undefined, headers: {} };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    const next = jest.fn();
 
-      verifyJWT(mockReq as Request, mockRes as Response, mockNext);
+    verifyJWT(req, res as any, next);
 
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Unauthorized',
-      });
-      expect(mockNext).not.toHaveBeenCalled();
-    });
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Unauthorized' });
+    expect(next).not.toHaveBeenCalled();
+  });
 
     it('should return 401 when cookies object is undefined', () => {
       mockReq.cookies = undefined;
