@@ -27,12 +27,12 @@ describe('Category Service', () => {
         json: async () => ({ success: true, data: mockCategories })
       });
 
-      const result = await fetchCategories('test-token');
+      const result = await fetchCategories();
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/admin/categories'),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
+          credentials: 'include'
         })
       );
 
@@ -46,7 +46,7 @@ describe('Category Service', () => {
         json: async () => ({ message: 'Unauthorized' })
       });
 
-      await expect(fetchCategories('invalid-token')).rejects.toThrow('Unauthorized');
+      await expect(fetchCategories()).rejects.toThrow('Unauthorized');
     });
 
     it('throws generic error when no message provided', async () => {
@@ -55,7 +55,7 @@ describe('Category Service', () => {
         json: async () => ({})
       });
 
-      await expect(fetchCategories('test-token')).rejects.toThrow('Error al obtener categorías');
+      await expect(fetchCategories()).rejects.toThrow('Error al obtener categorías');
     });
   });
 
@@ -75,14 +75,6 @@ describe('Category Service', () => {
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/admin/categories/public/list')
-      );
-
-      // Should NOT have Authorization header for public endpoint
-      expect(fetch).not.toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: expect.any(String) })
-        })
       );
 
       expect(result).toHaveLength(2);
@@ -108,16 +100,14 @@ describe('Category Service', () => {
         json: async () => ({ success: true, data: newCategory })
       });
 
-      const result = await createCategory('test-token', 'Sopas');
+      const result = await createCategory('Sopas');
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/admin/categories'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token'
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ name: 'Sopas' })
         })
       );
@@ -131,7 +121,7 @@ describe('Category Service', () => {
         json: async () => ({ message: 'Category already exists' })
       });
 
-      await expect(createCategory('test-token', 'Bebidas')).rejects.toThrow(
+      await expect(createCategory('Bebidas')).rejects.toThrow(
         'Category already exists'
       );
     });
@@ -142,7 +132,7 @@ describe('Category Service', () => {
         json: async () => ({})
       });
 
-      await expect(createCategory('test-token', 'Test')).rejects.toThrow('Error al crear categoría');
+      await expect(createCategory('Test')).rejects.toThrow('Error al crear categoría');
     });
   });
 
@@ -153,13 +143,13 @@ describe('Category Service', () => {
         json: async () => ({ success: true, message: 'Category deleted' })
       });
 
-      const result = await deleteCategory('test-token', '123');
+      const result = await deleteCategory('123');
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/admin/categories/123'),
         expect.objectContaining({
           method: 'DELETE',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
+          credentials: 'include'
         })
       );
 
@@ -172,7 +162,7 @@ describe('Category Service', () => {
         json: async () => ({ message: 'Category has products' })
       });
 
-      await expect(deleteCategory('test-token', '123')).rejects.toThrow('Category has products');
+      await expect(deleteCategory('123')).rejects.toThrow('Category has products');
     });
 
     it('throws generic error when no message provided', async () => {
@@ -181,7 +171,7 @@ describe('Category Service', () => {
         json: async () => ({})
       });
 
-      await expect(deleteCategory('test-token', '123')).rejects.toThrow(
+      await expect(deleteCategory('123')).rejects.toThrow(
         'Error al eliminar categoría'
       );
     });

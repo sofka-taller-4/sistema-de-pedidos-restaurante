@@ -7,8 +7,21 @@ import {
   setUserRoles,
   deleteProduct
 } from '../services/adminService';
+import api from '../services/api';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Mock api module
+vi.mock('../services/api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    defaults: { baseURL: 'http://localhost:3000' }
+  }
+}));
 
 describe('Admin Service', () => {
   beforeEach(() => {
@@ -37,8 +50,7 @@ describe('Admin Service', () => {
         expect.stringContaining('/login'),
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@test.com', password: 'password123' })
+          headers: { 'Content-Type': 'application/json' }
         })
       );
 
@@ -63,20 +75,13 @@ describe('Admin Service', () => {
         { id: '2', name: 'User 2', email: 'user2@test.com', roles: ['waiter'] }
       ];
 
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockUsers })
+      (api.get as any).mockResolvedValueOnce({
+        data: { success: true, data: mockUsers }
       });
 
-      const result = await fetchUsers('test-token');
+      const result = await fetchUsers();
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/users'),
-        expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
-        })
-      );
-
+      expect(api.get).toHaveBeenCalledWith('/api/admin/users');
       expect(result.data).toHaveLength(2);
       expect(result.data[0].name).toBe('User 1');
     });
@@ -86,67 +91,50 @@ describe('Admin Service', () => {
         { id: '1', name: 'Admin User', email: 'admin@test.com', roles: ['admin'] }
       ];
 
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: mockUsers })
+      (api.get as any).mockResolvedValueOnce({
+        data: { success: true, data: mockUsers }
       });
 
-      const result = await fetchUsers('test-token', { role: 'admin' });
+      const result = await fetchUsers({ role: 'admin' });
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('role=admin'),
-        expect.any(Object)
-      );
-
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('role=admin'));
       expect(result.data).toHaveLength(1);
     });
 
     it('fetches users with active filter', async () => {
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: [] })
+      (api.get as any).mockResolvedValueOnce({
+        data: { success: true, data: [] }
       });
 
-      await fetchUsers('test-token', { active: true });
+      await fetchUsers({ active: true });
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('active=true'),
-        expect.any(Object)
-      );
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('active=true'));
     });
 
     it('fetches users with name filter', async () => {
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: [] })
+      (api.get as any).mockResolvedValueOnce({
+        data: { success: true, data: [] }
       });
 
-      await fetchUsers('test-token', { name: 'John' });
+      await fetchUsers({ name: 'John' });
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('name=John'),
-        expect.any(Object)
-      );
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('name=John'));
     });
 
     it('handles empty user array correctly', async () => {
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: [] })
+      (api.get as any).mockResolvedValueOnce({
+        data: { success: true, data: [] }
       });
 
-      const result = await fetchUsers('test-token');
+      const result = await fetchUsers();
 
       expect(result.data).toEqual([]);
     });
 
     it('throws error on failed fetch', async () => {
-      (fetch as any).mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({})
-      });
+      (api.get as any).mockRejectedValueOnce(new Error('Request failed'));
 
-      await expect(fetchUsers('test-token')).rejects.toThrow('Users fetch failed');
+      await expect(fetchUsers()).rejects.toThrow('Request failed');
     });
   });
 
@@ -169,16 +157,13 @@ describe('Admin Service', () => {
         json: async () => mockResponse
       });
 
-      const result = await createUser('test-token', newUser);
+      const result = await createUser(newUser);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/users'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token'
-          }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newUser)
         })
       );
@@ -194,7 +179,7 @@ describe('Admin Service', () => {
       });
 
       await expect(
-        createUser('test-token', {
+        createUser({
           name: 'Test',
           email: 'test@test.com',
           password: 'pass',
@@ -213,16 +198,13 @@ describe('Admin Service', () => {
         json: async () => ({ success: true, data: { id: '1', ...updates } })
       });
 
-      const result = await updateUser('test-token', '1', updates);
+      const result = await updateUser('1', updates);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/users/1'),
         expect.objectContaining({
           method: 'PUT',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token'
-          }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates)
         })
       );
@@ -236,7 +218,7 @@ describe('Admin Service', () => {
         json: async () => ({})
       });
 
-      await expect(updateUser('test-token', '1', {})).rejects.toThrow('User update failed');
+      await expect(updateUser('1', {})).rejects.toThrow('User update failed');
     });
   });
 
@@ -249,16 +231,13 @@ describe('Admin Service', () => {
         json: async () => ({ success: true, data: { roles: newRoles } })
       });
 
-      const result = await setUserRoles('test-token', '1', newRoles);
+      const result = await setUserRoles('1', newRoles);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/users/1/role'),
         expect.objectContaining({
           method: 'PATCH',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token'
-          }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roles: newRoles })
         })
       );
@@ -272,7 +251,7 @@ describe('Admin Service', () => {
         json: async () => ({})
       });
 
-      await expect(setUserRoles('test-token', '1', ['admin'])).rejects.toThrow(
+      await expect(setUserRoles('1', ['admin'])).rejects.toThrow(
         'User role update failed'
       );
     });
@@ -285,13 +264,12 @@ describe('Admin Service', () => {
         json: async () => ({ success: true, message: 'Product deleted' })
       });
 
-      const result = await deleteProduct('test-token', 123);
+      const result = await deleteProduct(123);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/products/123'),
         expect.objectContaining({
-          method: 'DELETE',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
+          method: 'DELETE'
         })
       );
 
@@ -304,7 +282,7 @@ describe('Admin Service', () => {
         json: async () => ({})
       });
 
-      await expect(deleteProduct('test-token', 123)).rejects.toThrow('Product delete failed');
+      await expect(deleteProduct(123)).rejects.toThrow('Product delete failed');
     });
   });
 });

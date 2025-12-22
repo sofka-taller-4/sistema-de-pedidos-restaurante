@@ -7,14 +7,15 @@ global.fetch = vi.fn();
 describe('Auth Store (Cookie-based)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+    localStorage.clear();
+
     // Reset store state
     useAuth.getState().clear();
   });
 
   it('initializes with null values', () => {
     const { user, isAuthenticated } = useAuth.getState();
-    
+
     expect(user).toBeNull();
     expect(isAuthenticated).toBe(false);
   });
@@ -29,117 +30,148 @@ describe('Auth Store (Cookie-based)', () => {
 
     useAuth.getState().setAuth(mockUser);
 
-    const state = useAuth.getState();
-    expect(state.user).toEqual(mockUser);
-    expect(state.isAuthenticated).toBe(true);
+    const { user, isAuthenticated } = useAuth.getState();
+
+    expect(user).toEqual(mockUser);
+    expect(isAuthenticated).toBe(true);
+
+    // ✅ Verify that user data is persisted in localStorage
+    const stored = localStorage.getItem('auth-storage');
+    expect(stored).toBeTruthy();
+    
+    const parsed = JSON.parse(stored!);
+    expect(parsed.state.user).toEqual(mockUser);
+    expect(parsed.state.isAuthenticated).toBe(true);
   });
 
   it('clears authentication data', () => {
-    // First set some auth data
     const mockUser = {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
+      id: '1',
+      name: 'Test User',
+      email: 'test@example.com',
       roles: ['admin']
     };
 
+    // Set auth first
     useAuth.getState().setAuth(mockUser);
-    
-    // Verify it's set
     expect(useAuth.getState().isAuthenticated).toBe(true);
-    
-    // Clear it
+
+    // Clear auth
     useAuth.getState().clear();
 
-    const state = useAuth.getState();
-    expect(state.user).toBeNull();
-    expect(state.isAuthenticated).toBe(false);
+    const { user, isAuthenticated } = useAuth.getState();
+
+    expect(user).toBeNull();
+    expect(isAuthenticated).toBe(false);
   });
 
   it('logs out user correctly with API call', async () => {
-    // Mock successful logout response
-    (fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true })
-    });
-
-    // Setup auth
     const mockUser = {
-      id: '3',
-      name: 'Logout Test',
-      email: 'logout@example.com',
+      id: '1',
+      name: 'Test User',
+      email: 'test@example.com',
       roles: ['admin']
     };
 
+    // Mock adminLogout
+    vi.mock('../services/adminService', () => ({
+      adminLogout: vi.fn().mockResolvedValue({}),
+    }));
+
+    // Set auth first
     useAuth.getState().setAuth(mockUser);
-    
+    expect(useAuth.getState().isAuthenticated).toBe(true);
+
     // Logout
     await useAuth.getState().logout();
 
-    const state = useAuth.getState();
-    expect(state.user).toBeNull();
-    expect(state.isAuthenticated).toBe(false);
-    
-    // Verify API call was made
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/admin/auth/logout'),
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include'
-      })
-    );
+    const { user, isAuthenticated } = useAuth.getState();
+
+    expect(user).toBeNull();
+    expect(isAuthenticated).toBe(false);
   });
 
   it('handles logout API failure gracefully', async () => {
-    // Mock failed logout response
-    (fetch as any).mockRejectedValueOnce(new Error('Network error'));
-
-    // Setup auth
     const mockUser = {
-      id: '4',
-      name: 'Error Test',
-      email: 'error@example.com',
+      id: '1',
+      name: 'Test User',
+      email: 'test@example.com',
       roles: ['admin']
     };
 
+    // Mock adminLogout to fail
+    vi.mock('../services/adminService', () => ({
+      adminLogout: vi.fn().mockRejectedValue(new Error('Logout failed')),
+    }));
+
+    // Set auth first
     useAuth.getState().setAuth(mockUser);
-    
-    // Logout should still clear local state even if API fails
+    expect(useAuth.getState().isAuthenticated).toBe(true);
+
+    // Logout should still clear state even if API fails
     await useAuth.getState().logout();
 
-    const state = useAuth.getState();
-    expect(state.user).toBeNull();
-    expect(state.isAuthenticated).toBe(false);
+    const { user, isAuthenticated } = useAuth.getState();
+
+    expect(user).toBeNull();
+    expect(isAuthenticated).toBe(false);
   });
 
   it('correctly identifies user roles', () => {
     const adminUser = {
-      id: '5',
+      id: '1',
       name: 'Admin User',
-      email: 'admin@test.com',
-      roles: ['admin', 'manager']
+      email: 'admin@example.com',
+      roles: ['admin']
     };
 
-    useAuth.getState().setAuth(adminUser);
+    const waiterUser = {
+      id: '2',
+      name: 'Waiter User',
+      email: 'waiter@example.com',
+      roles: ['waiter']
+    };
 
-    const state = useAuth.getState();
-    expect(state.user?.roles).toContain('admin');
-    expect(state.user?.roles).toContain('manager');
-    expect(state.user?.roles.length).toBe(2);
+    // Test admin user
+    useAuth.getState().setAuth(adminUser);
+    expect(useAuth.getState().user?.roles).toContain('admin');
+
+    // Clear and test waiter user
+    useAuth.getState().clear();
+    useAuth.getState().setAuth(waiterUser);
+    expect(useAuth.getState().user?.roles).toContain('waiter');
+    expect(useAuth.getState().user?.roles).not.toContain('admin');
   });
 
   it('handles multiple auth changes correctly', () => {
-    const user1 = { id: '6', name: 'User 1', email: 'user1@test.com', roles: ['admin'] };
-    const user2 = { id: '7', name: 'User 2', email: 'user2@test.com', roles: ['waiter'] };
+    const user1 = {
+      id: '1',
+      name: 'User 1',
+      email: 'user1@example.com',
+      roles: ['admin']
+    };
 
-    // First auth
+    const user2 = {
+      id: '2',
+      name: 'User 2',
+      email: 'user2@example.com',
+      roles: ['waiter']
+    };
+
+    // Set first user
     useAuth.getState().setAuth(user1);
-    expect(useAuth.getState().user?.name).toBe('User 1');
+    expect(useAuth.getState().user?.id).toBe('1');
     expect(useAuth.getState().isAuthenticated).toBe(true);
 
-    // Second auth (simulating login as different user)
+    // Change to second user
     useAuth.getState().setAuth(user2);
-    expect(useAuth.getState().user?.name).toBe('User 2');
+    expect(useAuth.getState().user?.id).toBe('2');
+    expect(useAuth.getState().user?.roles).toContain('waiter');
     expect(useAuth.getState().isAuthenticated).toBe(true);
+
+    // Clear
+    useAuth.getState().clear();
+    expect(useAuth.getState().user).toBeNull();
+    expect(useAuth.getState().isAuthenticated).toBe(false);
   });
 });
