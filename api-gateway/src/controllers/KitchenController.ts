@@ -13,14 +13,38 @@ export class KitchenController {
     this.proxyService = proxyService;
   }
 
+  /**
+   * Valida si un estado es válido
+   */
   private isValidStatus(status: string): boolean {
     return VALID_ORDER_STATUSES.includes(status);
   }
 
+  /**
+   * Construye la ruta de consulta con parámetros
+   */
+  private buildQueryPath(basePath: string, query: Record<string, any>): string {
+    const qs = new URLSearchParams(query as Record<string, string>).toString();
+    return qs ? `${basePath}?${qs}` : basePath;
+  }
+
+  /**
+   * Valida el estado del pedido y devuelve error si es inválido
+   */
+  private validateOrderStatus(status: string, res: Response): boolean {
+    if (!status || !this.isValidStatus(status)) {
+      res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: `Invalid status. Valid statuses are: ${VALID_ORDER_STATUSES.join(', ')}`,
+      });
+      return false;
+    }
+    return true;
+  }
+
   getOrders = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const qs = new URLSearchParams(req.query as Record<string, string>).toString();
-      const path = qs ? `/kitchen/orders?${qs}` : '/kitchen/orders';
+      const path = this.buildQueryPath('/kitchen/orders', req.query as Record<string, any>);
       const response = await this.proxyService.forward(path, 'GET');
       
       res.status(HTTP_STATUS.OK).json(
@@ -37,11 +61,7 @@ export class KitchenController {
       const { status } = req.body;
 
       // Validate status
-      if (!status || !this.isValidStatus(status)) {
-        res.status(HTTP_STATUS.BAD_REQUEST).json({
-          success: false,
-          message: `Invalid status. Valid statuses are: ${VALID_ORDER_STATUSES.join(', ')}`,
-        });
+      if (!this.validateOrderStatus(status, res)) {
         return;
       }
 
@@ -62,7 +82,12 @@ export class KitchenController {
   updateOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
-      const response = await this.proxyService.forward(`/kitchen/orders/${id}`, 'PUT', req.body, req.headers as Record<string, string>);
+      const response = await this.proxyService.forward(
+        `/kitchen/orders/${id}`,
+        'PUT',
+        req.body,
+        req.headers as Record<string, string>
+      );
       
       res.status(HTTP_STATUS.OK).json(
         formatSuccessResponse(response.data, 'Order updated successfully')
