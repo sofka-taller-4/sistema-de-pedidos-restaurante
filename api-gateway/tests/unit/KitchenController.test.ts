@@ -123,5 +123,34 @@ describe('KitchenController - Unit Tests', () => {
 
       expect(mockNext).toHaveBeenCalledWith(error);
     });
+
+    it('should calculate estimated time when preparation time is provided', async () => {
+      mockReq.params = { id: '123' };
+      const preparationTime = 30; // 30 minutos
+      mockReq.body = { preparationTime };
+
+      mockProxyService.forward = jest.fn().mockResolvedValue({
+        data: { orderId: '123', estimatedTime: expect.any(Number) },
+        status: 200,
+      });
+
+      await controller.updateOrder(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockProxyService.forward).toHaveBeenCalledWith(
+        '/kitchen/orders/123',
+        'PUT',
+        mockReq.body,
+        mockReq.headers
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({
+            estimatedTime: expect.any(Number),
+          }),
+        })
+      );
+    });
   });
 });
