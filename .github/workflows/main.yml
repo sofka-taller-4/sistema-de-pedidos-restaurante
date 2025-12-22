@@ -5,6 +5,11 @@ on:
     branches:
       - develop
 
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  MIN_COVERAGE: 60
+
 jobs:
   # Job para servicios Node.js/TypeScript
   test-node-services:
@@ -12,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     
     strategy:
-      fail-fast: true # Detiene todos los jobs si uno falla
+      fail-fast: true
       matrix:
         service:
           - api-gateway
@@ -21,47 +26,66 @@ jobs:
           - orders-producer-frontend
     
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
       
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         working-directory: ${{ matrix.service }}
         run: npm ci
       
-      - name: Run tests with coverage
+      - name: 🧪 Run tests with coverage
         working-directory: ${{ matrix.service }}
         run: npm run test:coverage
+        env:
+          NODE_ENV: test
       
-      - name: Check coverage threshold
+      - name: 📊 Check coverage threshold (${{ env.MIN_COVERAGE }}%)
         working-directory: ${{ matrix.service }}
         run: |
-          echo "Verificando cobertura mínima del 60%..."
-          # Extrae el porcentaje de cobertura del output de Jest
-          COVERAGE=$(npm run test:coverage 2>&1 | grep -oP 'All files\s+\|\s+\K[\d.]+' | head -1)
+          echo "================================================"
+          echo "Verificando cobertura para ${{ matrix.service }}"
+          echo "Umbral mínimo requerido: ${{ env.MIN_COVERAGE }}%"
+          echo "================================================"
           
-          if [ -z "$COVERAGE" ]; then
-            echo "❌ No se pudo obtener el porcentaje de cobertura"
+          # Buscar el archivo de resumen de cobertura
+          if [ -f coverage/coverage-summary.json ]; then
+            # Extraer cobertura de líneas
+            COVERAGE=$(cat coverage/coverage-summary.json | grep -o '"lines":{[^}]*"pct":[0-9.]*' | grep -o '[0-9.]*$')
+            
+            if [ -z "$COVERAGE" ]; then
+              echo "⚠️  Usando método alternativo para obtener cobertura..."
+              COVERAGE=$(cat coverage/coverage-summary.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['total']['lines']['pct'])" 2>/dev/null || echo "0")
+            fi
+            
+            echo "📈 Cobertura detectada: ${COVERAGE}%"
+            
+            # Validar que sea un número
+            if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+              echo "❌ Error: Cobertura inválida"
+              exit 1
+            fi
+            
+            # Comparar con umbral
+            if awk -v cov="$COVERAGE" -v min="${{ env.MIN_COVERAGE }}" 'BEGIN { exit (cov < min) ? 0 : 1 }'; then
+              echo "❌ FALLO: Cobertura ${COVERAGE}% < ${{ env.MIN_COVERAGE }}%"
+              exit 1
+            fi
+            
+            echo "✅ ÉXITO: Cobertura ${COVERAGE}% >= ${{ env.MIN_COVERAGE }}%"
+          else
+            echo "⚠️  No se encontró coverage-summary.json"
+            echo "El test debe haber fallado - verificar logs anteriores"
             exit 1
           fi
-          
-          echo "📊 Cobertura actual: ${COVERAGE}%"
-          
-          # Compara con el umbral mínimo
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "❌ La cobertura ${COVERAGE}% es menor al 60% requerido"
-            exit 1
-          fi
-          
-          echo "✅ Cobertura OK: ${COVERAGE}% >= 60%"
       
-      - name: Upload coverage reports
+      - name: 📤 Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -75,51 +99,63 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Python
+      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: orders-producer-python/requirements.txt
       
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         working-directory: orders-producer-python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-cov # Asegurar que pytest-cov está instalado
+          pip install pytest-cov
       
-      - name: Run tests with coverage
+      - name: 🧪 Run tests with coverage
         working-directory: orders-producer-python
         run: |
-          pytest --cov=app \
-                 --cov-report=term-missing \
-                 --cov-report=html \
-                 --cov-fail-under=60 \
-                 --cov-report=xml:coverage.xml
-                 -v
+          pytest \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=${{ env.MIN_COVERAGE }} \
+            -v
+        env:
+          PYTHONPATH: .
       
-      - name: Upload coverage reports
+      - name: 📤 Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-orders-producer-python
-          path: orders-producer-python/htmlcov/
+          path: |
+            orders-producer-python/htmlcov/
+            orders-producer-python/coverage.xml
           retention-days: 7
 
-  # Job final que depende de todos los anteriores
+  # Job final de validación
   ci-success:
-    name: ✅ All Tests Passed
+    name: ✅ CI Tests Complete
     runs-on: ubuntu-latest
     needs: [test-node-services, test-python-service]
     if: success()
     
     steps:
-      - name: Success message
+      - name: 🎉 Success message
         run: |
-          echo "🎉 Todos los tests pasaron exitosamente"
-          echo "✅ Cobertura mínima del 60% alcanzada en todos los servicios"
-          echo "🚀 El PR está listo para revisión"
+          echo "================================================"
+          echo "✅ TODOS LOS TESTS PASARON EXITOSAMENTE"
+          echo "================================================"
+          echo ""
+          echo "📊 Cobertura: >= ${{ env.MIN_COVERAGE }}% en todos los servicios"
+          echo "🧪 Tests: Todos pasaron"
+          echo "🚀 Estado: Listo para SonarQube scan"
+          echo ""
+          echo "Siguiente paso: build.yml ejecutará análisis de SonarQube"
+          echo "================================================"
