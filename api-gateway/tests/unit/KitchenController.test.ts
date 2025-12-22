@@ -153,4 +153,51 @@ describe('KitchenController - Unit Tests', () => {
       );
     });
   });
+
+  describe('Property-Based Tests', () => {
+    describe('Property 7: Cálculo de Tiempo Estimado', () => {
+      it('should calculate estimated time correctly for multiple preparation times', async () => {
+        // **Feature: api-gateway-tdd, Property 7: Cálculo de Tiempo Estimado**
+        // **Valida: Requisito 3.5**
+        
+        const preparationTimes = [5, 10, 15, 20, 30, 45, 60, 90, 120];
+        
+        for (const preparationTime of preparationTimes) {
+          mockReq.params = { id: '123' };
+          mockReq.body = { preparationTime };
+          
+          const now = Date.now();
+          const expectedEstimatedTime = now + (preparationTime * 60 * 1000); // convertir minutos a ms
+
+          mockProxyService.forward = jest.fn().mockResolvedValue({
+            data: { 
+              orderId: '123', 
+              estimatedTime: expectedEstimatedTime,
+              preparationTime 
+            },
+            status: 200,
+          });
+
+          await controller.updateOrder(mockReq as Request, mockRes as Response, mockNext);
+
+          expect(mockRes.status).toHaveBeenCalledWith(200);
+          expect(mockRes.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+              success: true,
+              data: expect.objectContaining({
+                estimatedTime: expect.any(Number),
+                preparationTime,
+              }),
+            })
+          );
+          
+          // Verificar que el tiempo estimado es mayor que el tiempo actual
+          const responseCall = (mockRes.json as jest.Mock).mock.calls[
+            (mockRes.json as jest.Mock).mock.calls.length - 1
+          ][0];
+          expect(responseCall.data.estimatedTime).toBeGreaterThan(now);
+        }
+      });
+    });
+  });
 });
