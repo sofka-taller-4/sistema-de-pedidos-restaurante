@@ -30,7 +30,8 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
     const payload = jwt.verify(token, JWT_SECRET) as any;
     req.user = { id: payload.sub, email: payload.email, roles: payload.roles || [] };
     return next();
-  } catch (err) {
+  } catch (err: unknown) {
+    console.error('❌ Error verifying JWT:', err);
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 }

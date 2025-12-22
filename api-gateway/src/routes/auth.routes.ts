@@ -83,7 +83,8 @@ router.post('/reset-password', async (req, res) => {
     console.log('🪵 id que se enviará a updateUserPassword:', idToUse);
     await updateUserPassword(idToUse, password);
     res.json({ success: true });
-  } catch (err) {
+  } catch (err: unknown) {
+    console.error('❌ Error en reset-password:', err);
     return res.status(400).json({ success: false, message: 'Token inválido o expirado.' });
   }
 });
