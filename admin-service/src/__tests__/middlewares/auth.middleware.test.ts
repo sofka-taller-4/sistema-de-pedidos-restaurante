@@ -11,7 +11,8 @@ describe('Auth Middleware', () => {
 
   beforeEach(() => {
     mockReq = {
-      headers: {}
+      headers: {},
+      cookies: {} // Asegura que cookies nunca sea undefined
     };
     mockRes = {
       status: jest.fn().mockReturnThis(),
@@ -22,7 +23,7 @@ describe('Auth Middleware', () => {
 
   describe('requireAuth', () => {
     it('should return 401 when no authorization header is present', () => {
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+      requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -35,7 +36,7 @@ describe('Auth Middleware', () => {
     it('should return 401 when authorization header does not start with Bearer', () => {
       mockReq.headers = { authorization: 'Basic sometoken' };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -48,7 +49,7 @@ describe('Auth Middleware', () => {
     it('should return 401 when token is invalid', () => {
       mockReq.headers = { authorization: 'Bearer invalid-token' };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -67,7 +68,7 @@ describe('Auth Middleware', () => {
 
       mockReq.headers = { authorization: `Bearer ${expiredToken}` };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -86,7 +87,7 @@ describe('Auth Middleware', () => {
 
       mockReq.headers = { authorization: `Bearer ${validToken}` };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockReq.user).toBeDefined();
@@ -99,7 +100,7 @@ describe('Auth Middleware', () => {
     it('should handle token without Bearer prefix gracefully', () => {
       mockReq.headers = { authorization: 'sometoken' };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockNext).not.toHaveBeenCalled();
@@ -108,7 +109,7 @@ describe('Auth Middleware', () => {
     it('should handle empty Bearer token', () => {
       mockReq.headers = { authorization: 'Bearer ' };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockNext).not.toHaveBeenCalled();
@@ -123,7 +124,7 @@ describe('Auth Middleware', () => {
 
       mockReq.headers = { authorization: `Bearer ${tokenWithoutRoles}` };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockReq.user?.roles).toEqual([]);
@@ -138,7 +139,7 @@ describe('Auth Middleware', () => {
 
       mockReq.headers = { authorization: `Bearer ${multiRoleToken}` };
 
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockReq.user?.roles).toEqual(['admin', 'waiter', 'cook']);
@@ -148,7 +149,7 @@ describe('Auth Middleware', () => {
   describe('requireRole', () => {
     it('should return 401 when req.user is not set', () => {
       const middleware = requireRole('admin');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -166,7 +167,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('admin');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -184,7 +185,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('admin');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -198,7 +199,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('admin');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -212,7 +213,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('waiter');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -226,7 +227,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('cook');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -240,7 +241,7 @@ describe('Auth Middleware', () => {
       };
 
       const middleware = requireRole('admin');
-      middleware(mockReq as Request, mockRes as Response, mockNext);
+        middleware(mockReq, mockRes, mockNext);
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockNext).not.toHaveBeenCalled();
@@ -258,7 +259,7 @@ describe('Auth Middleware', () => {
       mockReq.headers = { authorization: `Bearer ${validToken}` };
 
       // Primero requireAuth
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
 
       // Reset mock
@@ -266,7 +267,7 @@ describe('Auth Middleware', () => {
 
       // Luego requireRole
       const roleMiddleware = requireRole('admin');
-      roleMiddleware(mockReq as Request, mockRes as Response, mockNext);
+        roleMiddleware(mockReq, mockRes, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
     });
 
@@ -280,7 +281,7 @@ describe('Auth Middleware', () => {
       mockReq.headers = { authorization: `Bearer ${validToken}` };
 
       // Primero requireAuth (pasa)
-      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+        requireAuth(mockReq, mockRes, mockNext);
       expect(mockNext).toHaveBeenCalledTimes(1);
 
       // Reset mocks
@@ -290,8 +291,8 @@ describe('Auth Middleware', () => {
 
       // Luego requireRole (falla)
       const roleMiddleware = requireRole('admin');
-      roleMiddleware(mockReq as Request, mockRes as Response, mockNext);
-      
+        roleMiddleware(mockReq, mockRes, mockNext);
+
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockNext).not.toHaveBeenCalled();
     });

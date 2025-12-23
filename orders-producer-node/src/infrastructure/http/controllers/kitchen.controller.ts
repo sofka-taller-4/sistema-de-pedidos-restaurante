@@ -19,6 +19,17 @@ export function getRepository(): OrderRepository {
   return repo;
 }
 
+/**
+ * Valida que customerName sea un string cuando está presente
+ * Protección contra NoSQL Injection (objetos MongoDB como { $ne: null })
+ */
+function validateCustomerNameType(customerName: any): string | null {
+  if (customerName !== undefined && typeof customerName !== 'string') {
+    return "customerName debe ser una cadena de texto";
+  }
+  return null;
+}
+
 export async function getKitchenOrders(req: Request, res: Response, next: NextFunction) {
   try {
     if (!repo) {
@@ -75,14 +86,14 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     // Validar estado
     const validStatuses: KitchenOrder["status"][] = ["pending", "preparing", "ready", "completed", "cancelled"];
     if (!status || typeof status !== 'string' || !(validStatuses as string[]).includes(status)) {
-      return res.status(400).json({ 
-        error: "Estado inválido", 
-        validStatuses 
+      return res.status(400).json({
+        error: "Estado inválido",
+        validStatuses
       });
     }
 
     const updated = await repo.updateStatus(id, status as KitchenOrder["status"]);
-    
+
     if (!updated) {
       return res.status(404).json({ error: "Orden no encontrada" });
     }
@@ -91,9 +102,9 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     const updatedOrder = await repo.getById(id);
     if (updatedOrder) {
       console.log(`📢 Enviando notificación WebSocket para orden ${id}...`);
-      notifyClients({ 
-        type: "ORDER_STATUS_CHANGED", 
-        order: updatedOrder 
+      notifyClients({
+        type: "ORDER_STATUS_CHANGED",
+        order: updatedOrder
       });
       console.log(`✅ Notificación enviada: Orden ${id} cambió a estado ${status}`);
     } else {
@@ -121,6 +132,12 @@ export async function updateOrder(req: Request, res: Response, next: NextFunctio
       return res.status(400).json({ error: "ID de orden requerido" });
     }
 
+    // 🔒 Validar tipo de customerName (protección contra NoSQL Injection)
+    const customerNameError = validateCustomerNameType(customerName);
+    if (customerNameError) {
+      return res.status(400).json({ error: customerNameError });
+    }
+
     // Get existing order
     const existingOrder = await repo.getById(id);
     if (!existingOrder) {
@@ -146,14 +163,14 @@ export async function updateOrder(req: Request, res: Response, next: NextFunctio
 
     // 🔥 Notificar cambios por WebSocket
     console.log(`📢 Enviando notificación ORDER_UPDATED para orden ${id}...`);
-    notifyClients({ 
-      type: "ORDER_UPDATED", 
-      order: updatedOrder 
+    notifyClients({
+      type: "ORDER_UPDATED",
+      order: updatedOrder
     });
     console.log(`✅ Notificación ORDER_UPDATED enviada`);
 
-    return res.json({ 
-      success: true, 
+    return res.json({
+      success: true,
       data: updatedOrder,
       message: "Order updated successfully"
     });

@@ -48,10 +48,10 @@ describe('Auth Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      
+
       // ✅ No token in response body
       expect(response.body.token).toBeUndefined();
-      
+
       // ✅ User data in response
       expect(response.body.user).toBeDefined();
       expect(response.body.user.email).toBe('test@example.com');
@@ -60,19 +60,19 @@ describe('Auth Routes', () => {
       // ✅ Verify HttpOnly cookies are set (access + refresh)
       const cookies = response.headers['set-cookie'] as unknown as string[];
       expect(cookies).toBeDefined();
-      
+
       const accessTokenCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
       expect(accessTokenCookie).toBeDefined();
       expect(accessTokenCookie).toContain('HttpOnly');
       expect(accessTokenCookie).toContain('SameSite=Lax');
-      
+
       const refreshTokenCookie = cookies.find((cookie: string) => cookie.startsWith('refreshToken='));
       expect(refreshTokenCookie).toBeDefined();
       expect(refreshTokenCookie).toContain('HttpOnly');
       expect(refreshTokenCookie).toContain('Path=/admin/auth/refresh');
 
       // ✅ Verify access token in cookie is valid
-      const tokenMatch = accessTokenCookie!.match(/accessToken=([^;]+)/);
+      const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
       expect(tokenMatch).toBeTruthy();
       const token = tokenMatch![1];
       const decoded = jwt.verify(token, JWT_SECRET) as any;
@@ -165,13 +165,13 @@ describe('Auth Routes', () => {
         .send({ email: 'multirole@example.com', password: 'password123' });
 
       expect(response.status).toBe(200);
-      
+
       // ✅ Extract token from cookie
       const cookies = response.headers['set-cookie'] as unknown as string[];
       const accessTokenCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
-      const tokenMatch = accessTokenCookie!.match(/accessToken=([^;]+)/);
+      const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
       const token = tokenMatch![1];
-      
+
       const decoded = jwt.verify(token, JWT_SECRET) as any;
       expect(decoded.roles).toEqual(['admin', 'waiter', 'cook']);
     });
@@ -237,7 +237,7 @@ describe('Auth Routes', () => {
     it('should refresh access token with valid refresh token', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      const user = await db.collection('users').insertOne({
+      await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -253,12 +253,12 @@ describe('Auth Routes', () => {
       const cookies = loginResponse.headers['set-cookie'] as unknown as string[];
       const refreshTokenCookie = cookies.find((cookie: string) => cookie.startsWith('refreshToken='));
       expect(refreshTokenCookie).toBeDefined();
-      
+
       // Extract just the token value from the cookie
-      const tokenMatch = refreshTokenCookie!.match(/refreshToken=([^;]+)/);
+      const tokenMatch = (/refreshToken=([^;]+)/).exec(refreshTokenCookie!);
       expect(tokenMatch).toBeTruthy();
       const refreshTokenValue = tokenMatch![1];
-      
+
       // Use refresh token (simulate the cookie being sent)
       const refreshResponse = await request(app)
         .post('/admin/auth/refresh')
@@ -305,11 +305,11 @@ describe('Auth Routes', () => {
       // ✅ Verify both cookies are cleared
       const cookies = response.headers['set-cookie'] as unknown as string[];
       expect(cookies).toBeDefined();
-      
+
       const clearAccessCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
       expect(clearAccessCookie).toBeDefined();
       expect(clearAccessCookie).toContain('accessToken=;');
-      
+
       const clearRefreshCookie = cookies.find((cookie: string) => cookie.startsWith('refreshToken='));
       expect(clearRefreshCookie).toBeDefined();
       expect(clearRefreshCookie).toContain('refreshToken=;');
