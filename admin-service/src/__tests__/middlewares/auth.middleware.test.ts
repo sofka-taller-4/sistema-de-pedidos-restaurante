@@ -5,14 +5,14 @@ import { requireAuth, requireRole } from '../../transport/http/middlewares/auth'
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-local';
 
 describe('Auth Middleware', () => {
-  let mockReq: Partial<Request>;
-  let mockRes: Partial<Response>;
+  let mockReq: any;
+  let mockRes: any;
   let mockNext: NextFunction;
 
   beforeEach(() => {
     mockReq = {
       headers: {},
-      cookies: {} // Asegura que cookies nunca sea undefined
+      cookies: {}
     };
     mockRes = {
       status: jest.fn().mockReturnThis(),
