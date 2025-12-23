@@ -8,12 +8,12 @@ on:
       - 'feature/**'
       - 'hotfix/**'
       - 'refactor/**'
-      - 'prueba4'
       
   pull_request:
     branches:
       - develop
       - main  
+
 env:
   NODE_VERSION: '22'
   PYTHON_VERSION: '3.11'
@@ -29,8 +29,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
+    # ✅ MONGODB COMO SERVICIO
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping: 1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
     strategy:
-      fail-fast: false # NO Detener si alguna matriz falla
+      fail-fast: false
       matrix:
         service:
           - api-gateway
@@ -49,33 +61,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
       
-      - name: 📦 Install system dependencies for MongoDB Memory Server
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcurl4 \
-            openssl \
-            libssl3 \
-            liblzma5 \
-            libgssapi-krb5-2 \
-            zlib1g \
-            libsnappy1v5
-      
       - name: 📦 Install dependencies
         working-directory: ${{ matrix.service }}
         run: npm ci
-        env:
-          MONGOMS_DOWNLOAD_MIRROR: https://fastdl.mongodb.org
-          MONGOMS_VERSION: 6.0.13
       
       - name: 🧪 Run tests with coverage
         working-directory: ${{ matrix.service }}
         run: npm run test:coverage
         env:
           NODE_ENV: test
-          MONGOMS_DOWNLOAD_MIRROR: https://fastdl.mongodb.org
-          MONGOMS_VERSION: 6.0.13
-          MONGOMS_DISABLE_POSTINSTALL: 1
+          MONGODB_URI: mongodb://localhost:27017/test
       
       - name: 📊 Check coverage threshold
         working-directory: ${{ matrix.service }}
@@ -93,6 +88,7 @@ jobs:
           fi
       
       - name: 📤 Upload coverage
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.service }}
@@ -134,6 +130,7 @@ jobs:
             -v
       
       - name: 📤 Upload coverage
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-orders-producer-python
@@ -159,13 +156,11 @@ jobs:
         with:
           fetch-depth: 0
       
-      # Descargar todos los reportes de cobertura
       - name: 📥 Download coverage reports
         uses: actions/download-artifact@v4
         with:
           path: coverage-reports
       
-      # Reorganizar coverage reports
       - name: 📁 Organize coverage files
         run: |
           mkdir -p api-gateway/coverage
@@ -174,14 +169,12 @@ jobs:
           mkdir -p orders-producer-frontend/coverage
           mkdir -p orders-producer-python
           
-          # Copiar reportes a sus ubicaciones
           cp -r coverage-reports/coverage-api-gateway/* api-gateway/coverage/ 2>/dev/null || true
           cp -r coverage-reports/coverage-admin-service/* admin-service/coverage/ 2>/dev/null || true
           cp -r coverage-reports/coverage-orders-producer-node/* orders-producer-node/coverage/ 2>/dev/null || true
           cp -r coverage-reports/coverage-orders-producer-frontend/* orders-producer-frontend/coverage/ 2>/dev/null || true
           cp -r coverage-reports/coverage-orders-producer-python/* orders-producer-python/ 2>/dev/null || true
           
-          # Verificar que existen
           echo "Verificando reportes de cobertura:"
           ls -lh api-gateway/coverage/lcov.info 2>/dev/null && echo "✅ API Gateway" || echo "⚠️  API Gateway"
           ls -lh admin-service/coverage/lcov.info 2>/dev/null && echo "✅ Admin Service" || echo "⚠️  Admin Service"
@@ -204,6 +197,3 @@ jobs:
           echo "✅ Cobertura >= 60%"
           echo "✅ SonarQube ejecutado"
           echo "================================================"
-
-########################################
-########################################          
