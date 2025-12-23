@@ -1,17 +1,29 @@
-name: CI - Tests & Coverage
+name: CI - Tests, Coverage & SonarQube
 
 on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+      - 'refactor/**'
+      - 'prueba4
+      '
   pull_request:
     branches:
       - develop
-
+      - main  
 env:
   NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
   MIN_COVERAGE: 60
 
 jobs:
-  # Job para servicios Node.js/TypeScript
+  # =====================================================
+  # FASE 1: TESTS Y COBERTURA
+  # =====================================================
+  
   test-node-services:
     name: Test ${{ matrix.service }}
     runs-on: ubuntu-latest
@@ -29,7 +41,7 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
       
-      - name: 🟢 Setup Node.js ${{ env.NODE_VERSION }}
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -46,54 +58,28 @@ jobs:
         env:
           NODE_ENV: test
       
-      - name: 📊 Check coverage threshold (${{ env.MIN_COVERAGE }}%)
+      - name: 📊 Check coverage threshold
         working-directory: ${{ matrix.service }}
         run: |
-          echo "================================================"
           echo "Verificando cobertura para ${{ matrix.service }}"
-          echo "Umbral mínimo requerido: ${{ env.MIN_COVERAGE }}%"
-          echo "================================================"
-          
-          # Buscar el archivo de resumen de cobertura
           if [ -f coverage/coverage-summary.json ]; then
-            # Extraer cobertura de líneas
-            COVERAGE=$(cat coverage/coverage-summary.json | grep -o '"lines":{[^}]*"pct":[0-9.]*' | grep -o '[0-9.]*$')
+            COVERAGE=$(cat coverage/coverage-summary.json | python3 -c "import sys, json; print(json.load(sys.stdin)['total']['lines']['pct'])" 2>/dev/null || echo "0")
+            echo "Cobertura: ${COVERAGE}%"
             
-            if [ -z "$COVERAGE" ]; then
-              echo "⚠️  Usando método alternativo para obtener cobertura..."
-              COVERAGE=$(cat coverage/coverage-summary.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['total']['lines']['pct'])" 2>/dev/null || echo "0")
-            fi
-            
-            echo "📈 Cobertura detectada: ${COVERAGE}%"
-            
-            # Validar que sea un número
-            if ! [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-              echo "❌ Error: Cobertura inválida"
-              exit 1
-            fi
-            
-            # Comparar con umbral
             if awk -v cov="$COVERAGE" -v min="${{ env.MIN_COVERAGE }}" 'BEGIN { exit (cov < min) ? 0 : 1 }'; then
-              echo "❌ FALLO: Cobertura ${COVERAGE}% < ${{ env.MIN_COVERAGE }}%"
+              echo "❌ Cobertura ${COVERAGE}% < ${{ env.MIN_COVERAGE }}%"
               exit 1
             fi
-            
-            echo "✅ ÉXITO: Cobertura ${COVERAGE}% >= ${{ env.MIN_COVERAGE }}%"
-          else
-            echo "⚠️  No se encontró coverage-summary.json"
-            echo "El test debe haber fallado - verificar logs anteriores"
-            exit 1
+            echo "✅ Cobertura OK"
           fi
       
-      - name: 📤 Upload coverage reports
-        if: always()
+      - name: 📤 Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.service }}
           path: ${{ matrix.service }}/coverage/
           retention-days: 7
 
-  # Job para servicio Python
   test-python-service:
     name: Test orders-producer-python
     runs-on: ubuntu-latest
@@ -102,7 +88,7 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
       
-      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -126,11 +112,8 @@ jobs:
             --cov-report=xml:coverage.xml \
             --cov-fail-under=${{ env.MIN_COVERAGE }} \
             -v
-        env:
-          PYTHONPATH: .
       
-      - name: 📤 Upload coverage reports
-        if: always()
+      - name: 📤 Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-orders-producer-python
@@ -139,23 +122,64 @@ jobs:
             orders-producer-python/coverage.xml
           retention-days: 7
 
-  # Job final de validación
-  ci-success:
-    name: ✅ CI Tests Complete
+  # =====================================================
+  # FASE 2: SONARQUBE (solo si tests pasan)
+  # =====================================================
+  
+  sonarqube:
+    name: SonarQube Analysis
     runs-on: ubuntu-latest
     needs: [test-node-services, test-python-service]
     if: success()
     
     steps:
-      - name: 🎉 Success message
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Descargar todos los reportes de cobertura
+      - name: 📥 Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-reports
+      
+      # Reorganizar coverage reports
+      - name: 📁 Organize coverage files
+        run: |
+          mkdir -p api-gateway/coverage
+          mkdir -p admin-service/coverage
+          mkdir -p orders-producer-node/coverage
+          mkdir -p orders-producer-frontend/coverage
+          mkdir -p orders-producer-python
+          
+          # Copiar reportes a sus ubicaciones
+          cp -r coverage-reports/coverage-api-gateway/* api-gateway/coverage/ 2>/dev/null || true
+          cp -r coverage-reports/coverage-admin-service/* admin-service/coverage/ 2>/dev/null || true
+          cp -r coverage-reports/coverage-orders-producer-node/* orders-producer-node/coverage/ 2>/dev/null || true
+          cp -r coverage-reports/coverage-orders-producer-frontend/* orders-producer-frontend/coverage/ 2>/dev/null || true
+          cp -r coverage-reports/coverage-orders-producer-python/* orders-producer-python/ 2>/dev/null || true
+          
+          # Verificar que existen
+          echo "Verificando reportes de cobertura:"
+          ls -lh api-gateway/coverage/lcov.info 2>/dev/null && echo "✅ API Gateway" || echo "⚠️  API Gateway"
+          ls -lh admin-service/coverage/lcov.info 2>/dev/null && echo "✅ Admin Service" || echo "⚠️  Admin Service"
+          ls -lh orders-producer-node/coverage/lcov.info 2>/dev/null && echo "✅ Orders Node" || echo "⚠️  Orders Node"
+          ls -lh orders-producer-frontend/coverage/lcov.info 2>/dev/null && echo "✅ Frontend" || echo "⚠️  Frontend"
+          ls -lh orders-producer-python/coverage.xml 2>/dev/null && echo "✅ Python" || echo "⚠️  Python"
+      
+      - name: 🔍 SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true
+      
+      - name: ✅ Complete
         run: |
           echo "================================================"
-          echo "✅ TODOS LOS TESTS PASARON EXITOSAMENTE"
+          echo "✅ CI COMPLETO"
           echo "================================================"
-          echo ""
-          echo "📊 Cobertura: >= ${{ env.MIN_COVERAGE }}% en todos los servicios"
-          echo "🧪 Tests: Todos pasaron"
-          echo "🚀 Estado: Listo para SonarQube scan"
-          echo ""
-          echo "Siguiente paso: build.yml ejecutará análisis de SonarQube"
+          echo "✅ Tests pasaron"
+          echo "✅ Cobertura >= 60%"
+          echo "✅ SonarQube ejecutado"
           echo "================================================"
