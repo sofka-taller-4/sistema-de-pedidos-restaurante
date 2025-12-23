@@ -37,3 +37,8 @@ class OrderMessage(OrderIn):
     id: str
     createdAt: datetime
     status: Literal["pendiente", "preparando", "listo"] = "pendiente"
+    
+    @property
+    def total(self) -> float:
+        """Calculate the total cost of the order."""
+        return sum(item.quantity * item.unitPrice for item in self.items)
