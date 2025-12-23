@@ -9,7 +9,7 @@ on:
       - 'hotfix/**'
       - 'refactor/**'
       - 'prueba4'
-      '
+      
   pull_request:
     branches:
       - develop
