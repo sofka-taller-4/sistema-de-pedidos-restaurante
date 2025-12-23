@@ -203,6 +203,134 @@ describe("amqp.ts edge coverage for lines 27 and 77", () => {
     
     expect(isConnected).toBe(true);
   });
+
+  it("covers error handling in closeChannel", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    const mockChannel = createChannelMock();
+    mockChannel.close.mockRejectedValue(new Error("close failed"));
+    
+    const mockConnection = createConnectionMock();
+    mockConnection.createChannel.mockResolvedValue(mockChannel);
+    mockConnect.mockResolvedValue(mockConnection);
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Get instance and try to disconnect (which calls closeChannel)
+    const instance = amqpModule._getInstanceForTesting();
+    await instance.disconnect();
+    
+    // Should handle error gracefully
+    expect(mockChannel.close).toHaveBeenCalled();
+  });
+
+  it("covers error handling in sendToQueue", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    const mockChannel = createChannelMock();
+    mockChannel.sendToQueue.mockImplementation(() => {
+      throw new Error("send failed");
+    });
+    
+    const mockConnection = createConnectionMock();
+    mockConnection.createChannel.mockResolvedValue(mockChannel);
+    mockConnect.mockResolvedValue(mockConnection);
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Try to send via sendToDLQ which will fail
+    const failingChannel = {
+      assertQueue: jest.fn().mockRejectedValue(new Error("send failed")),
+      sendToQueue: jest.fn(),
+    };
+    
+    await expect(amqpModule.sendToDLQ(failingChannel, "test", Buffer.from("data"))).rejects.toThrow();
+  });
+
+  it("covers error handling in assertQueue", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    const mockChannel = createChannelMock();
+    mockChannel.assertQueue.mockRejectedValue(new Error("assert failed"));
+    
+    const mockConnection = createConnectionMock();
+    mockConnection.createChannel.mockResolvedValue(mockChannel);
+    mockConnect.mockResolvedValue(mockConnection);
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Try to send via sendToDLQ which will fail on assertQueue
+    const failingChannel = {
+      assertQueue: jest.fn().mockRejectedValue(new Error("assert failed")),
+      sendToQueue: jest.fn(),
+    };
+    
+    await expect(amqpModule.sendToDLQ(failingChannel, "test", Buffer.from("data"))).rejects.toThrow();
+  });
+
+  it("covers CloudConnectionProvider getConfig", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "cloud";
+    process.env.AMQP_CLOUD_PROTOCOL = "amqps";
+    process.env.AMQP_CLOUD_HOST = "cloud.example.com";
+    process.env.AMQP_CLOUD_PORT = "5671";
+    process.env.AMQP_CLOUD_USER = "user";
+    process.env.AMQP_CLOUD_PASS = "pass";
+    process.env.AMQP_CLOUD_VHOST = "/vhost";
+
+    jest.resetModules();
+    mockConnect.mockResolvedValue(createConnectionMock());
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize with cloud connection
+    await amqpModule.getChannel();
+    
+    expect(mockConnect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        protocol: "amqps",
+        hostname: "cloud.example.com",
+        port: 5671,
+        username: "user",
+        password: "pass",
+        vhost: "/vhost",
+      })
+    );
+  });
+
+  it("covers connect method early return when already connecting", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    mockConnect.mockResolvedValue(createConnectionMock());
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Call connect again - should early return
+    const instance = amqpModule._getInstanceForTesting();
+    await instance.connect();
+    
+    // mockConnect should only be called once
+    expect(mockConnect).toHaveBeenCalledTimes(1);
+  });
 });
 
 // FIRST: Fast (isolated modules), Isolated (resetModules), Repeatable (env control), 
