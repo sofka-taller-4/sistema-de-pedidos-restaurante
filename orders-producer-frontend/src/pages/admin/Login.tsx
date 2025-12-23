@@ -34,6 +34,11 @@ const Login: React.FC = () => {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    // Validar campos vacíos antes de llamar adminLogin
+    if (!email.trim() || !password.trim()) {
+      setError('Por favor ingresa email y contraseña');
+      return;
+    }
     try {
       console.log('📤 Sending login request for:', email);
       const res = await adminLogin(email, password);

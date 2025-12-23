@@ -35,7 +35,7 @@ export default function ProductCard({ product, onAdd, quantity = 0 }: ProductCar
 
       {/* Información inferior */}
       <div className="px-4">
-        <h3 className="font-semibold text-lg text-gray-900 truncate">{product.name}</h3>
+        <h3 className="font-semibold text-lg text-gray-900 truncate" data-testid="product-name">{product.name}</h3>
 
         <div className="flex items-center justify-between">
           <span className="text-2xl font-bold text-gray-900">

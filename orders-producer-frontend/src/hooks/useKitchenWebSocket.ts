@@ -3,7 +3,7 @@ import type { Pedido, KitchenOrderMessage, ProductoItem, ApiOrder } from '../typ
 import { getKitchenOrders } from '../services/orderService';
 
 // Get WebSocket URL from environment variables
-const getWebSocketUrl = (): string => {
+export const getWebSocketUrl = (): string => {
   const nodeServiceUrl = import.meta.env.VITE_NODE_MS_URL;
   if (nodeServiceUrl) {
     // Convert HTTP(S) URL to WebSocket URL
@@ -14,7 +14,7 @@ const getWebSocketUrl = (): string => {
 };
 
 // Helper: mapea el JSON del MS de cocina a la estructura de la tarjeta
-const mapOrderToPedido = (order: KitchenOrderMessage | ApiOrder): Pedido => {
+export const mapOrderToPedido = (order: KitchenOrderMessage | ApiOrder): Pedido => {
   const productos: ProductoItem[] = (order.items || []).map((item) => ({
     nombre: item.productName,
     cantidad: item.quantity,
