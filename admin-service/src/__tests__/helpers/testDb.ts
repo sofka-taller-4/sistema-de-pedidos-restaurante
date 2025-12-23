@@ -7,7 +7,6 @@ let db: Db;
 
 export async function setupTestDatabase(): Promise<Db> {
   try {
-    // ✅ SI HAY MONGODB_URI (CI), usar ese
     const mongoUri = process.env.MONGODB_URI;
     
     if (mongoUri) {
@@ -18,10 +17,9 @@ export async function setupTestDatabase(): Promise<Db> {
       return db;
     }
     
-    // ✅ SI NO (local), usar MongoMemoryServer
     console.log('🐇 Iniciando MongoMemoryServer (local)');
     mongoServer = await MongoMemoryServer.create({ 
-      binary: { version: '6.0.13' }  // ← Versión actualizada
+      binary: { version: '6.0.13' }
     });
     
     const uri = await mongoServer.getUri();
@@ -49,6 +47,9 @@ export async function clearDatabase(): Promise<void> {
   if (db) {
     const collections = await db.collections();
     await Promise.all(collections.map(c => c.deleteMany({})));
+    
+    // ✅ ESPERAR que MongoDB procese las eliminaciones
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 }
 
