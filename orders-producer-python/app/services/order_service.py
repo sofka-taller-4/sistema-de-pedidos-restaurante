@@ -1,5 +1,5 @@
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.order import OrderIn, OrderMessage
@@ -16,7 +16,7 @@ class OrderService:
             customerName=order_in.customerName,
             table=order_in.table,
             items=order_in.items,
-            createdAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
             status="pendiente"
         )
         self.repository.add(order_msg)
