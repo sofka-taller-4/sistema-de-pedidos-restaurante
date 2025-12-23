@@ -136,6 +136,8 @@ authRouter.post('/login', async (req, res) => {
 });
 
 // ✅ Endpoint de refresh
+import { ObjectId } from 'mongodb';
+// ...existing code...
 authRouter.post('/refresh', async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
@@ -162,8 +164,12 @@ authRouter.post('/refresh', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Invalid refresh token' });
     }
 
-    // Verificar que el usuario sigue activo
-    const user = await db.collection('users').findOne({ _id: decoded.sub });
+    // Buscar usuario por _id (convertir a ObjectId si es posible)
+    let userId = decoded.sub;
+    if (ObjectId.isValid(userId)) {
+      userId = new ObjectId(userId);
+    }
+    const user = await db.collection('users').findOne({ _id: userId });
     if (!user || !user.active) {
       // Revocar token si usuario está deshabilitado
       await db.collection('refresh_tokens').deleteMany({ userId: decoded.sub });
@@ -181,7 +187,7 @@ authRouter.post('/refresh', async (req, res) => {
     res.cookie('accessToken', newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // ✅ Cambiar de 'strict' a 'lax' para permitir cross-site
+      sameSite: 'lax',
       maxAge: 15 * 60 * 1000
     });
 
