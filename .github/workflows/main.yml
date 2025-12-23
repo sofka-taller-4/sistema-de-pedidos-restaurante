@@ -27,6 +27,7 @@ jobs:
   test-node-services:
     name: Test ${{ matrix.service }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     strategy:
       fail-fast: true
@@ -83,6 +84,7 @@ jobs:
   test-python-service:
     name: Test orders-producer-python
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
       - name: 📥 Checkout code
@@ -128,6 +130,7 @@ jobs:
   
   sonarqube:
     name: SonarQube Analysis
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     needs: [test-node-services, test-python-service]
     if: success()
