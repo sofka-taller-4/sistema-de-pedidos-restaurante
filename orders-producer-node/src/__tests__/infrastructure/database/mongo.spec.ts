@@ -43,6 +43,8 @@ describe("MongoSingleton", () => {
 
   test("connects and derives dbName from URI path", async () => {
     process.env.MONGO_URI = "mongodb://localhost:27017/mydb";
+    // Cerrar cualquier conexión previa
+    await MongoSingleton.close();
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
     const db = await MongoSingleton.connect();
     expect(db).toBeDefined();
