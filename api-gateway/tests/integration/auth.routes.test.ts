@@ -99,6 +99,22 @@ describe('Auth Routes - forgot-password', () => {
     expect(response.status).toBe(404);
     expect(response.body.success).toBe(false);
   });
+
+  it('should return 500 when user has no id field', async () => {
+    const mockUser = {
+      success: true,
+      data: { email: 'user@example.com', name: 'Test User' }
+    };
+
+    (UserService.getUserByEmail as jest.Mock).mockResolvedValue(mockUser);
+
+    const response = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'user@example.com' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.success).toBe(false);
+  });
 });
 
 describe('Auth Routes - reset-password', () => {
@@ -215,5 +231,68 @@ describe('Auth Routes - reset-password', () => {
 
     expect(response.status).toBe(200);
     expect(UserService.updateUserPassword).toHaveBeenCalledWith('123', 'newPassword123');
+  });
+
+  it('should return 400 when token does not contain userId', async () => {
+    const token = jwt.sign({}, JWT_SECRET, { expiresIn: '1h' });
+
+    const response = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'newPassword123' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.message).toContain('userId');
+  });
+
+  it('should return 500 when user data has no id field', async () => {
+    const token = jwt.sign({ userId: '123' }, JWT_SECRET, { expiresIn: '1h' });
+    const mockUser = {
+      success: true,
+      data: { email: 'user@example.com' }
+    };
+
+    (UserService.getUserById as jest.Mock).mockResolvedValue(mockUser);
+
+    const response = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'newPassword123' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.success).toBe(false);
+  });
+
+  it('should use userId from payload when available', async () => {
+    const token = jwt.sign({ userId: '456' }, JWT_SECRET, { expiresIn: '1h' });
+    const mockUser = {
+      success: true,
+      data: { id: '456', email: 'user@example.com' }
+    };
+
+    (UserService.getUserById as jest.Mock).mockResolvedValue(mockUser);
+    (UserService.updateUserPassword as jest.Mock).mockResolvedValue(true);
+
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'newPassword123' });
+
+    expect(UserService.getUserById).toHaveBeenCalledWith('456');
+  });
+
+  it('should use sub from payload when userId is not available', async () => {
+    const token = jwt.sign({ sub: '789' }, JWT_SECRET, { expiresIn: '1h' });
+    const mockUser = {
+      success: true,
+      data: { id: '789', email: 'user@example.com' }
+    };
+
+    (UserService.getUserById as jest.Mock).mockResolvedValue(mockUser);
+    (UserService.updateUserPassword as jest.Mock).mockResolvedValue(true);
+
+    await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token, password: 'newPassword123' });
+
+    expect(UserService.getUserById).toHaveBeenCalledWith('789');
   });
 });
