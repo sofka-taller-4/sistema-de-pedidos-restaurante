@@ -34,7 +34,7 @@ describe('Auth Routes', () => {
     it('should login with valid credentials and set HttpOnly cookie', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -42,8 +42,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      const user = await db.collection('users').findOne({ email: 'test@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -111,7 +111,7 @@ describe('Auth Routes', () => {
     it('should reject login with inactive user', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Inactive User',
         email: 'inactive@example.com',
         passwordHash,
@@ -119,9 +119,8 @@ describe('Auth Routes', () => {
         active: false,
       });
 
-      // ✅ CORREGIDO: Buscar el email correcto
-      const user = await db.collection('users').findOne({ email: 'inactive@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -135,7 +134,7 @@ describe('Auth Routes', () => {
     it('should reject login with wrong password', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('correctpassword', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -143,8 +142,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      const user = await db.collection('users').findOne({ email: 'test@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -158,7 +157,7 @@ describe('Auth Routes', () => {
     it('should include all user roles in cookie token', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Multi-Role User',
         email: 'multirole@example.com',
         passwordHash,
@@ -166,9 +165,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      // ✅ CORREGIDO: Buscar el email correcto
-      const user = await db.collection('users').findOne({ email: 'multirole@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -188,7 +186,7 @@ describe('Auth Routes', () => {
     it('should not include passwordHash in response', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -196,8 +194,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      const user = await db.collection('users').findOne({ email: 'test@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -228,7 +226,7 @@ describe('Auth Routes', () => {
     it('should handle case-sensitive email correctly', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -236,8 +234,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      const user = await db.collection('users').findOne({ email: 'test@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -251,7 +249,7 @@ describe('Auth Routes', () => {
     it('should refresh access token with valid refresh token', async () => {
       const db = getTestDb();
       const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
+      const result = await db.collection('users').insertOne({
         name: 'Test User',
         email: 'test@example.com',
         passwordHash,
@@ -259,8 +257,8 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      const user = await db.collection('users').findOne({ email: 'test@example.com' });
-      expect(user).toBeTruthy();
+      expect(result.insertedId).toBeTruthy();
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const loginResponse = await request(app)
         .post('/admin/auth/login')
