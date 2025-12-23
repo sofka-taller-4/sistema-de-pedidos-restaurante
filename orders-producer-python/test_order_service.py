@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 os.environ["CLOUDAMQP_URL"] = "amqp://guest:guest@localhost:5672/"
 
 # Mock de publish_order para evitar conexión real a RabbitMQ
@@ -286,7 +287,7 @@ def test_order_total_single_item(order_service):
     order = order_service.create_order(order_in)
     
     # Assert
-    expected_total = 2 * 15000  # 30000
+    expected_total = Decimal(2 * 15000)  # 30000
     assert order.total == expected_total
 
 def test_order_total_multiple_items(order_service):
@@ -352,3 +353,53 @@ def test_order_total_calculates_even_after_update(order_service, sample_order_in
     # Assert
     assert updated.total == 3 * 20000  # 60000
     assert updated.total != original_total
+
+# Part of the refactor process: TDD proves to be flexible
+def test_order_item_count(order_service):
+    """Test total item count calculation."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Burger", quantity=2, unitPrice=15000),
+            OrderItem(productName="Fries", quantity=3, unitPrice=8000)
+        ]
+    )
+    order = order_service.create_order(order_in)
+    assert order.item_count == 5  # 2 + 3
+
+def test_order_unique_products(order_service):
+    """Test unique product count."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Burger", quantity=2, unitPrice=15000),
+            OrderItem(productName="Fries", quantity=3, unitPrice=8000)
+        ]
+    )
+    order = order_service.create_order(order_in)
+    assert order.unique_products == 2
+
+def test_get_item_by_product_found(order_service):
+    """Test finding an item by product name."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[OrderItem(productName="Burger", quantity=2, unitPrice=15000)]
+    )
+    order = order_service.create_order(order_in)
+    item = order.get_item_by_product("Burger")
+    assert item is not None
+    assert item.quantity == 2
+
+def test_get_item_by_product_not_found(order_service):
+    """Test finding non-existent product."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[OrderItem(productName="Burger", quantity=2, unitPrice=15000)]
+    )
+    order = order_service.create_order(order_in)
+    item = order.get_item_by_product("Pizza")
+    assert item is None
