@@ -49,20 +49,33 @@ jobs:
           cache: 'npm'
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
       
-      - name: 📦 Install system dependencies for MongoDB
+      - name: 📦 Install system dependencies for MongoDB Memory Server
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4 openssl liblzma5 libgssapi-krb5-2
+          sudo apt-get install -y \
+            libcurl4 \
+            openssl \
+            libssl3 \
+            liblzma5 \
+            libgssapi-krb5-2 \
+            zlib1g \
+            libsnappy1v5
       
       - name: 📦 Install dependencies
         working-directory: ${{ matrix.service }}
         run: npm ci
+        env:
+          MONGOMS_DOWNLOAD_MIRROR: https://fastdl.mongodb.org
+          MONGOMS_VERSION: 6.0.13
       
       - name: 🧪 Run tests with coverage
         working-directory: ${{ matrix.service }}
         run: npm run test:coverage
         env:
           NODE_ENV: test
+          MONGOMS_DOWNLOAD_MIRROR: https://fastdl.mongodb.org
+          MONGOMS_VERSION: 6.0.13
+          MONGOMS_DISABLE_POSTINSTALL: 1
       
       - name: 📊 Check coverage threshold
         working-directory: ${{ matrix.service }}
