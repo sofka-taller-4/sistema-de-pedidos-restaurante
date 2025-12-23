@@ -288,3 +288,67 @@ def test_order_total_single_item(order_service):
     # Assert
     expected_total = 2 * 15000  # 30000
     assert order.total == expected_total
+
+def test_order_total_multiple_items(order_service):
+    """
+    TDD: Calculate total for order with multiple different items.
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Hamburguesa", quantity=2, unitPrice=15000),
+            OrderItem(productName="Papas", quantity=1, unitPrice=8000),
+            OrderItem(productName="Gaseosa", quantity=3, unitPrice=5000)
+        ]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    expected_total = (2 * 15000) + (1 * 8000) + (3 * 5000)  # 30000 + 8000 + 15000 = 53000
+    assert order.total == expected_total
+
+def test_order_total_with_zero_price_item(order_service):
+    """
+    TDD: Calculate total when one item has zero price (promotional item).
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Hamburguesa", quantity=1, unitPrice=15000),
+            OrderItem(productName="Promotional Gift", quantity=1, unitPrice=0)
+        ]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    assert order.total == 15000  # Only the hamburger counts
+
+def test_order_total_calculates_even_after_update(order_service, sample_order_in):
+    """
+    TDD: Verify total recalculates correctly after order update.
+    """
+    # Arrange
+    original = order_service.create_order(sample_order_in)
+    original_total = original.total
+    
+    # Act - Update with different items
+    new_order_in = OrderIn(
+        customerName="Updated",
+        table="Mesa 2",
+        items=[
+            OrderItem(productName="Pizza", quantity=3, unitPrice=20000)
+        ]
+    )
+    updated = order_service.update_order(original.id, new_order_in)
+    
+    # Assert
+    assert updated.total == 3 * 20000  # 60000
+    assert updated.total != original_total
