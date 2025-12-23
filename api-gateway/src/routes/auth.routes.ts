@@ -105,6 +105,7 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     
     res.json({ success: true });
   } catch (err: unknown) {
+    console.error('Error resetting password:', err);
     return res.status(400).json({ 
       success: false, 
       message: 'Token inválido o expirado.' 
