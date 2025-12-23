@@ -1,6 +1,12 @@
 import request from 'supertest';
 import express from 'express';
+
+
 import jwt from 'jsonwebtoken';
+
+const createAdminToken = () => {
+  return jwt.sign({ sub: '123', email: 'admin@example.com', roles: ['admin'] }, JWT_SECRET, { expiresIn: '1h' });
+};
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-local';
 
@@ -35,9 +41,7 @@ const app = express();
 app.use(express.json());
 app.use('/admin/products', productsRouter);
 
-const createAdminToken = () => {
-  return jwt.sign({ sub: '123', email: 'admin@example.com', roles: ['admin'] }, JWT_SECRET, { expiresIn: '1h' });
-};
+
 
 describe('Products Routes', () => {
   beforeAll(async () => {
