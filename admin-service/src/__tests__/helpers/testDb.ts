@@ -21,7 +21,7 @@ export async function setupTestDatabase(): Promise<Db> {
     // ✅ SI NO (local), usar MongoMemoryServer
     console.log('🐇 Iniciando MongoMemoryServer (local)');
     mongoServer = await MongoMemoryServer.create({ 
-      binary: { version: '6.0.13' }  // ← Versión actualizada
+      binary: { version: '4.2.0' }  // ← Versión actualizada
     });
     
     const uri = await mongoServer.getUri();
