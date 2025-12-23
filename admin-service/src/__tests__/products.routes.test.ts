@@ -76,10 +76,12 @@ describe('Products Routes', () => {
         .send(productData);
 
       expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.name).toBe('Pizza Margherita');
-      expect(response.body.data.createdAt).toBeDefined();
-      expect(response.body.data.updatedAt).toBeDefined();
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      const data = response.body.data;
+      expect(data).toHaveProperty('name', 'Pizza Margherita');
+      expect(data).toHaveProperty('createdAt');
+      expect(data).toHaveProperty('updatedAt');
     });
 
     it('should reject duplicate product name', async () => {
