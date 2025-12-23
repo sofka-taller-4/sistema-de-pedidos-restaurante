@@ -234,7 +234,7 @@ describe('Auth Routes - reset-password', () => {
   });
 
   it('should return 400 when token does not contain userId', async () => {
-    const token = jwt.sign({ sub: '123' }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({}, JWT_SECRET, { expiresIn: '1h' });
 
     const response = await request(app)
       .post('/api/auth/reset-password')
@@ -242,6 +242,7 @@ describe('Auth Routes - reset-password', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
+    expect(response.body.message).toContain('userId');
   });
 
   it('should return 500 when user data has no id field', async () => {

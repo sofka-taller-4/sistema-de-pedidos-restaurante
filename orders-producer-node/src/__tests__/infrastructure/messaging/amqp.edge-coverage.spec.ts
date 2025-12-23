@@ -163,6 +163,46 @@ describe("amqp.ts edge coverage for lines 27 and 77", () => {
     const channel2 = await amqpModule.getChannel();
     expect(channel2).toBeDefined();
   });
+
+  it("covers disconnect method with connection", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    const mockConnection = createConnectionMock();
+    mockConnect.mockResolvedValue(mockConnection);
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Get instance and disconnect
+    const instance = amqpModule._getInstanceForTesting();
+    await instance.disconnect();
+    
+    expect(mockConnection.close).toHaveBeenCalled();
+  });
+
+  it("covers isConnected method returning true", async () => {
+    process.env.AMQP_CONNECTION_TYPE = "local";
+    process.env.AMQP_LOCAL_HOST = "localhost";
+
+    jest.resetModules();
+    mockConnect.mockResolvedValue(createConnectionMock());
+
+    const amqpModule = require("../../../infrastructure/messaging/amqp.connection");
+    
+    // Initialize connection
+    await amqpModule.getChannel();
+    
+    // Get connection manager and check status
+    const instance = amqpModule._getInstanceForTesting();
+    const connectionManager = instance._getConnectionManager();
+    const isConnected = connectionManager?.isConnected();
+    
+    expect(isConnected).toBe(true);
+  });
 });
 
 // FIRST: Fast (isolated modules), Isolated (resetModules), Repeatable (env control), 
