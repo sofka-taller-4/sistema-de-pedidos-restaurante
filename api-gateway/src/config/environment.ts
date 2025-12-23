@@ -26,12 +26,12 @@ class EnvironmentValidator {
 
     // Retorna las variables con valores por defecto si no están definidas
     return {
-      PORT: parseInt(process.env.PORT || '8080', 10),
+      PORT: Number.parseInt(process.env.PORT || '8080', 10),
       PYTHON_MS_URL: process.env.PYTHON_MS_URL!,
       NODE_MS_URL: process.env.NODE_MS_URL!,
       ADMIN_MS_URL: process.env.ADMIN_MS_URL,
-      REQUEST_TIMEOUT: parseInt(process.env.REQUEST_TIMEOUT || '30000', 10),
-      RETRY_ATTEMPTS: parseInt(process.env.RETRY_ATTEMPTS || '3', 10),
+      REQUEST_TIMEOUT: Number.parseInt(process.env.REQUEST_TIMEOUT || '30000', 10),
+      RETRY_ATTEMPTS: Number.parseInt(process.env.RETRY_ATTEMPTS || '3', 10),
       JWT_SECRET: process.env.JWT_SECRET,
     };
   }

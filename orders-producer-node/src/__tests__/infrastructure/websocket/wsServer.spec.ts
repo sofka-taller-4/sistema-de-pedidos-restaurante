@@ -1,11 +1,15 @@
 import { WebSocket } from "ws";
+import { Server } from "http";
+
+// Mock clients set
+const mockClients = new Set();
 
 // Mock ws module ANTES de importar wsServer
 jest.mock("ws", () => {
-  const mockClients = new Set();
   return {
-    WebSocketServer: jest.fn(() => ({
+    WebSocketServer: jest.fn().mockImplementation(() => ({
       clients: mockClients,
+      on: jest.fn(),
     })),
     WebSocket: {
       OPEN: 1,
@@ -14,7 +18,7 @@ jest.mock("ws", () => {
   };
 });
 
-import { notifyClients, wss } from "../../../infrastructure/websocket/ws-server";
+import { notifyClients, initializeWebSocket } from "../../../infrastructure/websocket/ws-server";
 
 describe("wsServer", () => {
   const mockClient1 = {
@@ -29,15 +33,18 @@ describe("wsServer", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Inicializar wss con un mock de Server
+    const mockServer = {} as Server;
+    initializeWebSocket(mockServer);
     // Limpiar y agregar clientes mockeados
-    (wss.clients as any).clear();
-    (wss.clients as any).add(mockClient1);
-    (wss.clients as any).add(mockClient2);
+    mockClients.clear();
+    mockClients.add(mockClient1 as any);
+    mockClients.add(mockClient2 as any);
   });
 
   it("notifica a todos los clientes conectados", () => {
     const payload = { type: "ORDER_NEW", order: { id: "123" } };
-    
+
     notifyClients(payload);
 
     expect(mockClient1.send).toHaveBeenCalledWith(JSON.stringify(payload));
@@ -50,7 +57,7 @@ describe("wsServer", () => {
       send: jest.fn(),
     };
 
-    (wss.clients as any).add(closedClient);
+    mockClients.add(closedClient as any);
     notifyClients({ type: "TEST" });
 
     expect(closedClient.send).not.toHaveBeenCalled();
@@ -65,7 +72,7 @@ describe("wsServer", () => {
     };
 
     notifyClients(complexPayload);
-    
+
     expect(mockClient1.send).toHaveBeenCalledWith(JSON.stringify(complexPayload));
   });
 });

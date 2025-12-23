@@ -17,19 +17,20 @@ class MongoSingleton {
 
   private getUri(): string {
     // Leer URI de forma lazy para permitir que scripts la establezcan antes de conectar
-    return process.env.MONGO_URI || process.env.MONGO_URL || "mongodb+srv://andresburgos_db_user:hZvUXR6rIFu6kJAH@cluster0.ww4l0e2.mongodb.net/";
+    const uri = process.env.MONGO_URI || process.env.MONGO_URL || "";
+    return uri;
   }
 
   async connect(): Promise<Db> {
     if (this.db) return this.db;
-    
+
     const uri = this.getUri();
     if (!uri) throw new Error("MONGO_URI not provided");
 
     // Extraer nombre de base de datos de la URI si está presente
     // Formato: mongodb://host:port/database_name
     let dbName = process.env.MONGO_DB || "orders_db";
-    
+
     try {
       const url = new URL(uri);
       // Si la URI tiene pathname (nombre de BD), usarlo
