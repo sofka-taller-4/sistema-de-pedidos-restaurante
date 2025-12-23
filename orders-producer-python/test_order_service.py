@@ -265,3 +265,26 @@ def test_multiple_updates_preserve_original_timestamp(order_service, sample_orde
     
     # Assert
     assert updated.createdAt == original_timestamp, "createdAt should remain unchanged after multiple updates" 
+
+# ============================================================================
+# TDD approach
+# ============================================================================
+
+def test_order_total_single_item(order_service):
+    """
+    TDD RED: Calculate total for order with single item.
+    Formula: quantity * unitPrice
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[OrderItem(productName="Hamburguesa", quantity=2, unitPrice=15000)]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    expected_total = 2 * 15000  # 30000
+    assert order.total == expected_total
