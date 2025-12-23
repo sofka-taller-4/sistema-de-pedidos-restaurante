@@ -180,12 +180,12 @@ class QueueManager implements IQueueManager {
   async sendToQueue(
     queue: string,
     payload: Buffer,
-    options: amqp.Options.Publish = { persistent: true },
+    options?: amqp.Options.Publish,
   ): Promise<void> {
     try {
       const channel = await this.channelManager.getChannel();
       await this.assertQueue(queue);
-      channel.sendToQueue(queue, payload, options);
+      channel.sendToQueue(queue, payload, options ?? { persistent: true });
       this.logger.debug(`✅ Mensaje enviado a cola: ${queue}`);
     } catch (error) {
       this.logger.error(`❌ Error enviando mensaje a ${queue}:`, error);
@@ -193,10 +193,10 @@ class QueueManager implements IQueueManager {
     }
   }
 
-  async assertQueue(queue: string, options: any = { durable: true }): Promise<void> {
+  async assertQueue(queue: string, options?: any): Promise<void> {
     try {
       const channel = await this.channelManager.getChannel();
-      await channel.assertQueue(queue, options);
+      await channel.assertQueue(queue, options ?? { durable: true });
     } catch (error) {
       this.logger.error(`❌ Error afirmando cola ${queue}:`, error);
       throw error;
