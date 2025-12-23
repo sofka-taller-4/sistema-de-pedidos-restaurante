@@ -23,7 +23,7 @@ describe('Categories Routes', () => {
 
   beforeAll(async () => {
     await setupTestDatabase();
-    
+
     app = express();
     app.use(express.json());
     app.use('/admin/categories', categoriesRouter);
