@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-local';
 const app = express();
-app.use(cookieParser()); // ✅ Add cookie parser for tests
+app.use(cookieParser());
 app.use(express.json());
 app.use('/admin/auth', authRouter);
 
@@ -42,6 +42,9 @@ describe('Auth Routes', () => {
         active: true,
       });
 
+      const user = await db.collection('users').findOne({ email: 'test@example.com' });
+      expect(user).toBeTruthy();
+
       const response = await request(app)
         .post('/admin/auth/login')
         .send({ email: 'test@example.com', password: 'password123', _encrypted: false });
@@ -49,15 +52,12 @@ describe('Auth Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
 
-      // ✅ No token in response body
       expect(response.body.token).toBeUndefined();
 
-      // ✅ User data in response
       expect(response.body.user).toBeDefined();
       expect(response.body.user.email).toBe('test@example.com');
       expect(response.body.user.roles).toEqual(['admin']);
 
-      // ✅ Verify HttpOnly cookies are set (access + refresh)
       const cookies = response.headers['set-cookie'] as unknown as string[];
       expect(cookies).toBeDefined();
 
@@ -71,7 +71,6 @@ describe('Auth Routes', () => {
       expect(refreshTokenCookie).toContain('HttpOnly');
       expect(refreshTokenCookie).toContain('Path=/admin/auth/refresh');
 
-      // ✅ Verify access token in cookie is valid
       const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
       expect(tokenMatch).toBeTruthy();
       const token = tokenMatch![1];
@@ -120,6 +119,10 @@ describe('Auth Routes', () => {
         active: false,
       });
 
+      // ✅ CORREGIDO: Buscar el email correcto
+      const user = await db.collection('users').findOne({ email: 'inactive@example.com' });
+      expect(user).toBeTruthy();
+
       const response = await request(app)
         .post('/admin/auth/login')
         .send({ email: 'inactive@example.com', password: 'password123' });
@@ -139,6 +142,9 @@ describe('Auth Routes', () => {
         roles: ['admin'],
         active: true,
       });
+
+      const user = await db.collection('users').findOne({ email: 'test@example.com' });
+      expect(user).toBeTruthy();
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -160,13 +166,16 @@ describe('Auth Routes', () => {
         active: true,
       });
 
+      // ✅ CORREGIDO: Buscar el email correcto
+      const user = await db.collection('users').findOne({ email: 'multirole@example.com' });
+      expect(user).toBeTruthy();
+
       const response = await request(app)
         .post('/admin/auth/login')
         .send({ email: 'multirole@example.com', password: 'password123' });
 
       expect(response.status).toBe(200);
 
-      // ✅ Extract token from cookie
       const cookies = response.headers['set-cookie'] as unknown as string[];
       const accessTokenCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
       const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
@@ -186,6 +195,9 @@ describe('Auth Routes', () => {
         roles: ['admin'],
         active: true,
       });
+
+      const user = await db.collection('users').findOne({ email: 'test@example.com' });
+      expect(user).toBeTruthy();
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -224,12 +236,14 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      // MongoDB es case-sensitive por defecto
+      const user = await db.collection('users').findOne({ email: 'test@example.com' });
+      expect(user).toBeTruthy();
+
       const response = await request(app)
         .post('/admin/auth/login')
         .send({ email: 'TEST@EXAMPLE.COM', password: 'password123' });
 
-      expect(response.status).toBe(401); // No coincide exactamente
+      expect(response.status).toBe(401);
     });
   });
 
@@ -245,7 +259,9 @@ describe('Auth Routes', () => {
         active: true,
       });
 
-      // Login to get refresh token
+      const user = await db.collection('users').findOne({ email: 'test@example.com' });
+      expect(user).toBeTruthy();
+
       const loginResponse = await request(app)
         .post('/admin/auth/login')
         .send({ email: 'test@example.com', password: 'password123' });
@@ -254,12 +270,10 @@ describe('Auth Routes', () => {
       const refreshTokenCookie = cookies.find((cookie: string) => cookie.startsWith('refreshToken='));
       expect(refreshTokenCookie).toBeDefined();
 
-      // Extract just the token value from the cookie
       const tokenMatch = (/refreshToken=([^;]+)/).exec(refreshTokenCookie!);
       expect(tokenMatch).toBeTruthy();
       const refreshTokenValue = tokenMatch![1];
 
-      // Use refresh token (simulate the cookie being sent)
       const refreshResponse = await request(app)
         .post('/admin/auth/refresh')
         .set('Cookie', `refreshToken=${refreshTokenValue}`);
@@ -267,7 +281,6 @@ describe('Auth Routes', () => {
       expect(refreshResponse.status).toBe(200);
       expect(refreshResponse.body.success).toBe(true);
 
-      // ✅ Verify new access token is set
       const newCookies = refreshResponse.headers['set-cookie'] as unknown as string[];
       const newAccessTokenCookie = newCookies.find((cookie: string) => cookie.startsWith('accessToken='));
       expect(newAccessTokenCookie).toBeDefined();
@@ -302,7 +315,6 @@ describe('Auth Routes', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe('Logged out successfully');
 
-      // ✅ Verify both cookies are cleared
       const cookies = response.headers['set-cookie'] as unknown as string[];
       expect(cookies).toBeDefined();
 
