@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 15
     
     strategy:
-      fail-fast: false # Detener si alguna matriz falla
+      fail-fast: false # NO Detener si alguna matriz falla
       matrix:
         service:
           - api-gateway
