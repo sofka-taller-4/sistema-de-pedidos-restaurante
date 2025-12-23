@@ -22,6 +22,10 @@ authRouter.post('/login', async (req, res, next) => {
   if (typeof req.body.password === 'undefined') {
     return res.status(400).json({ success: false, message: 'Invalid payload' });
   }
+  // Solo si la contraseña no está encriptada, exigir mínimo 6 caracteres
+  if (!req.body._encrypted && typeof req.body.password === 'string' && req.body.password.length < 6) {
+    return res.status(400).json({ success: false, message: 'Invalid payload' });
+  }
   next();
 });
 authRouter.post('/login', async (req, res) => {
