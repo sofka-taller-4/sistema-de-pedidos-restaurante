@@ -35,7 +35,8 @@ authRouter.post('/login', async (req, res) => {
 
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) {
-    console.log('❌ Schema validation failed:', parsed.error);
+    // Evitar loguear .value que puede no existir
+    console.log('❌ Schema validation failed:', parsed.error.toString());
     return res.status(400).json({ success: false, message: 'Invalid payload' });
   }
 
