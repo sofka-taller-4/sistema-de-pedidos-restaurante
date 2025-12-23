@@ -1,7 +1,6 @@
 
 import * as amqp from "amqplib";
 import dotenv from "dotenv";
-import { EventEmitter } from "events";
 
 dotenv.config();
 
@@ -132,7 +131,7 @@ class ChannelManager implements IChannelManager {
   private channel: amqp.Channel | null = null;
   private connection: amqp.Connection | null = null;
 
-  constructor(private logger: ILogger) {}
+  constructor(private readonly logger: ILogger) {}
 
   setConnection(connection: amqp.Connection): void {
     this.connection = connection;
@@ -174,8 +173,8 @@ class ChannelManager implements IChannelManager {
 
 class QueueManager implements IQueueManager {
   constructor(
-    private channelManager: IChannelManager,
-    private logger: ILogger,
+    private readonly channelManager: IChannelManager,
+    private readonly logger: ILogger,
   ) {}
 
   async sendToQueue(
@@ -214,9 +213,9 @@ class RabbitMQConnectionManager implements IConnectionManager {
   private isConnecting: boolean = false;
 
   constructor(
-    private provider: IConnectionProvider,
-    private channelManager: ChannelManager,
-    private logger: ILogger,
+    private readonly provider: IConnectionProvider,
+    private readonly channelManager: ChannelManager,
+    private readonly logger: ILogger,
   ) {}
 
   async connect(): Promise<void> {
@@ -284,35 +283,33 @@ class RabbitMQConnection {
   private static instance: RabbitMQConnection | null = null;
   private connectionManager: RabbitMQConnectionManager | null = null;
   private queueManager: QueueManager | null = null;
-  private logger: ILogger;
+  private readonly logger: ILogger;
 
   private constructor(logger?: ILogger) {
     this.logger = logger || new ConsoleLogger();
   }
 
   static getInstance(logger?: ILogger): RabbitMQConnection {
-    if (!RabbitMQConnection.instance) {
-      RabbitMQConnection.instance = new RabbitMQConnection(logger);
-    }
+    RabbitMQConnection.instance ??= new RabbitMQConnection(logger);
     return RabbitMQConnection.instance;
   }
 
   async connect(): Promise<void> {
-    if (!this.connectionManager) {
-      const connectionType = process.env.AMQP_CONNECTION_TYPE || "local";
-      const provider =
-        connectionType === "cloud"
-          ? new CloudConnectionProvider()
-          : new LocalConnectionProvider();
+    if (this.connectionManager) return;
 
-      const channelManager = new ChannelManager(this.logger);
-      this.connectionManager = new RabbitMQConnectionManager(
-        provider,
-        channelManager,
-        this.logger,
-      );
-      this.queueManager = new QueueManager(channelManager, this.logger);
-    }
+    const connectionType = process.env.AMQP_CONNECTION_TYPE || "local";
+    const provider =
+      connectionType === "cloud"
+        ? new CloudConnectionProvider()
+        : new LocalConnectionProvider();
+
+    const channelManager = new ChannelManager(this.logger);
+    this.connectionManager = new RabbitMQConnectionManager(
+      provider,
+      channelManager,
+      this.logger,
+    );
+    this.queueManager = new QueueManager(channelManager, this.logger);
 
     await this.connectionManager.connect();
   }
