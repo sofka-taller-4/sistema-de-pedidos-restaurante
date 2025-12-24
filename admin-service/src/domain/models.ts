@@ -31,3 +31,31 @@ export interface RefreshToken {
   expiresAt: Date;
   createdAt: Date;
 }
+
+export enum TableStatus {
+  AVAILABLE = 'Available',
+  OCCUPIED = 'Occupied',
+  RESERVED = 'Reserved'
+}
+
+export class Table {
+  public id: string;
+  public tableNumber: number;
+  public capacity: number;
+  public status: TableStatus;
+  public createdAt: Date;
+  public updatedAt: Date;
+
+  constructor(tableNumber: number, capacity: number) {
+    this.id = this.generateId();
+    this.tableNumber = tableNumber;
+    this.capacity = capacity;
+    this.status = TableStatus.AVAILABLE;
+    this.createdAt = new Date();
+    this.updatedAt = new Date();
+  }
+
+  private generateId(): string {
+    return Math.random().toString(36).substr(2, 9);
+  }
+}
