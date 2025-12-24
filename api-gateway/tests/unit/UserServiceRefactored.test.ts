@@ -1,6 +1,6 @@
 import { UserService } from '../../src/services/UserServiceRefactored';
 import { IUserRepository } from '../../src/interfaces/IUserRepository';
-import { User, UpdatePasswordResponse } from '../../src/interfaces/IUserService';
+import { User, UpdatePasswordResponse, UserResponse } from '../../src/interfaces/IUserService';
 
 describe('UserServiceRefactored', () => {
   let userService: UserService;
@@ -27,7 +27,26 @@ describe('UserServiceRefactored', () => {
       const result = await userService.getUserByEmail(email);
 
       // Assert
-      expect(result).toEqual(expectedUser);
+      expect(result).toEqual({
+        success: true,
+        data: expectedUser
+      });
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(email);
+    });
+
+    it('debe retornar success false cuando el usuario no existe', async () => {
+      // Arrange
+      const email = 'test@example.com';
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+
+      // Act
+      const result = await userService.getUserByEmail(email);
+
+      // Assert
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
       expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(email);
     });
 
@@ -64,6 +83,21 @@ describe('UserServiceRefactored', () => {
         expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(email);
       }
     });
+
+    it('debe retornar success false cuando hay error en el repositorio', async () => {
+      // Arrange
+      const email = 'test@example.com';
+      mockUserRepository.findByEmail.mockRejectedValue(new Error('Database error'));
+
+      // Act
+      const result = await userService.getUserByEmail(email);
+
+      // Assert
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
+    });
   });
 
   describe('getUserById', () => {
@@ -77,7 +111,26 @@ describe('UserServiceRefactored', () => {
       const result = await userService.getUserById(id);
 
       // Assert
-      expect(result).toEqual(expectedUser);
+      expect(result).toEqual({
+        success: true,
+        data: expectedUser
+      });
+      expect(mockUserRepository.findById).toHaveBeenCalledWith(id);
+    });
+
+    it('debe retornar success false cuando el usuario no existe', async () => {
+      // Arrange
+      const id = '123';
+      mockUserRepository.findById.mockResolvedValue(null);
+
+      // Act
+      const result = await userService.getUserById(id);
+
+      // Assert
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
       expect(mockUserRepository.findById).toHaveBeenCalledWith(id);
     });
 
@@ -97,6 +150,21 @@ describe('UserServiceRefactored', () => {
       // Act & Assert
       await expect(userService.getUserById('   ')).rejects.toThrow('ID is required and must be a non-empty string');
       expect(mockUserRepository.findById).not.toHaveBeenCalled();
+    });
+
+    it('debe retornar success false cuando hay error en el repositorio', async () => {
+      // Arrange
+      const id = '123';
+      mockUserRepository.findById.mockRejectedValue(new Error('Database error'));
+
+      // Act
+      const result = await userService.getUserById(id);
+
+      // Assert
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
     });
   });
 

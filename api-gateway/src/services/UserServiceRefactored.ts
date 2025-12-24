@@ -1,17 +1,41 @@
-import { IUserService, User, UpdatePasswordResponse } from '../interfaces/IUserService';
+import { IUserService, User, UpdatePasswordResponse, UserResponse } from '../interfaces/IUserService';
 import { IUserRepository } from '../interfaces/IUserRepository';
 
 export class UserService implements IUserService {
   constructor(private readonly userRepository: IUserRepository) {}
 
-  async getUserByEmail(email: string): Promise<User | null> {
+  async getUserByEmail(email: string): Promise<UserResponse> {
     this.validateEmail(email);
-    return await this.userRepository.findByEmail(email);
+    
+    try {
+      const user = await this.userRepository.findByEmail(email);
+      return {
+        success: user !== null,
+        data: user
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: null
+      };
+    }
   }
 
-  async getUserById(id: string): Promise<User | null> {
+  async getUserById(id: string): Promise<UserResponse> {
     this.validateId(id);
-    return await this.userRepository.findById(id);
+    
+    try {
+      const user = await this.userRepository.findById(id);
+      return {
+        success: user !== null,
+        data: user
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: null
+      };
+    }
   }
 
   async updateUserPassword(id: string, password: string): Promise<UpdatePasswordResponse> {

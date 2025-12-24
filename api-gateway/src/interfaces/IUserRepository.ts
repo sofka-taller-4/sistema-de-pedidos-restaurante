@@ -1,4 +1,4 @@
-import { User, UpdatePasswordResponse } from './IUserService';
+import { User, UpdatePasswordResponse, UserResponse } from './IUserService';
 
 export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;

@@ -36,14 +36,17 @@ describe('UserService', () => {
       const result = await getUserByEmail(email);
 
       // Assert
-      expect(result).toEqual(expectedUserData);
+      expect(result).toEqual({
+        success: true,
+        data: expectedUserData
+      });
       expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/email/${encodeURIComponent(email)}`,
         'GET'
       );
     });
 
-    it('debe retornar null cuando la petición falla', async () => {
+    it('debe retornar success false cuando la petición falla', async () => {
       // Arrange
       const email = 'test@example.com';
       mockForward.mockRejectedValue(new Error('Network error'));
@@ -52,7 +55,10 @@ describe('UserService', () => {
       const result = await getUserByEmail(email);
 
       // Assert
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
       expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/email/${encodeURIComponent(email)}`,
         'GET'
@@ -101,14 +107,17 @@ describe('UserService', () => {
       const result = await getUserById(userId);
 
       // Assert
-      expect(result).toEqual(expectedUserData);
+      expect(result).toEqual({
+        success: true,
+        data: expectedUserData
+      });
       expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}`,
         'GET'
       );
     });
 
-    it('debe retornar null cuando la petición falla', async () => {
+    it('debe retornar success false cuando la petición falla', async () => {
       // Arrange
       const userId = '123';
       mockForward.mockRejectedValue(new Error('User not found'));
@@ -117,7 +126,10 @@ describe('UserService', () => {
       const result = await getUserById(userId);
 
       // Assert
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        success: false,
+        data: null
+      });
       expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}`,
         'GET'
