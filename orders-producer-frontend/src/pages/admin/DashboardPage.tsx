@@ -37,16 +37,25 @@ const DashboardPage: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics>({});
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<OrderStatus | 'all'>('all');
+  const [error, setError] = useState<string | null>(null);
 
   // Cargar datos iniciales
   useEffect(() => {
     const fetchInitialData = async () => {
       if (!isAuthenticated) return;
       setLoading(true);
-      const { orders, metrics } = await fetchDashboard();
-      setSnapshot(orders.data);
-      setMetrics(metrics.data);
-      setLoading(false);
+      try {
+        const { orders, metrics } = await fetchDashboard();
+        setSnapshot(orders.data);
+        setMetrics(metrics.data);
+      } catch (err) {
+        // Fallback visual: snapshot vacío y métricas vacías
+        setSnapshot({ byStatus: [], recent: [] });
+        setMetrics({});
+        setError(err instanceof Error ? err.message : 'Error al cargar el dashboard');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchInitialData();
   }, [isAuthenticated]);
@@ -148,10 +157,15 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-10 p-8 bg-neutral-100 dark:bg-neutral-900 min-h-screen transition-colors pl-64">
       {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-10">
+        <output className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-10">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
-        </div>
+        </output>
       )}
+            {error && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+                {error}
+              </div>
+            )}
       <div className="mb-6">
         <h2 className="text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
           <span className="text-4xl">📊</span> Panel Principal

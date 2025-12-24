@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getKitchenOrders, updateOrderStatus as updateOrderStatusAPI } from '../services/orderService';
-import type { ApiOrder } from '../types/order';
+import type { ApiOrder, KitchenOrder } from '../types/order';
 import type { OrderStatus } from '../components/KitchenOrderCard';
 
 // Get WebSocket URL from environment variables
-const getWebSocketUrl = (): string => {
+export const getWebSocketUrl = (): string => {
   const nodeServiceUrl = import.meta.env.VITE_NODE_MS_URL;
   if (nodeServiceUrl) {
     // Convert HTTP(S) URL to WebSocket URL
@@ -15,27 +15,8 @@ const getWebSocketUrl = (): string => {
 };
 
 // Order type matching KitchenOrderCard interface
-export interface KitchenOrder {
-  id: string;
-  fullId: string; // Full order ID for API calls
-  customerName: string;
-  phone: string;
-  time: string;
-  table: string;
-  products: {
-    name: string;
-    quantity: number;
-    price: number;
-    preparationTime?: number; // in minutes
-  }[];
-  total: number;
-  status: OrderStatus;
-  estimatedPrepTime?: number; // Total prep time in minutes
-  prepStartTime?: number; // Timestamp when cooking started
-}
-
 // Map API status to KitchenOrderCard status
-const mapApiStatusToOrderStatus = (status?: string): OrderStatus => {
+export const mapApiStatusToOrderStatus = (status?: string): OrderStatus => {
   switch (status) {
     case 'preparing':
       return 'Preparando';
@@ -51,19 +32,18 @@ const mapApiStatusToOrderStatus = (status?: string): OrderStatus => {
 };
 
 // Format time from ISO string to local time (Colombia timezone)
-const formatTime = (isoString: string): string => {
+export const formatTime = (isoString: string): string => {
   try {
-    // Parse the ISO string (handle microseconds that JavaScript may not handle well)
-    // The backend is sending UTC times
     const cleanedIso = isoString.substring(0, 19); // Keep only up to seconds: YYYY-MM-DDTHH:mm:ss
     const date = new Date(cleanedIso + 'Z'); // Add Z to indicate UTC
-    
-    // Use toLocaleTimeString with America/Bogota timezone to convert UTC to Colombia time
-    const formatted = date.toLocaleTimeString('es-CO', { 
-      hour: 'numeric', 
+    if (Number.isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    const formatted = date.toLocaleTimeString('es-CO', {
+      hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'America/Bogota'
+      timeZone: 'America/Bogota',
     });
     console.log(`⏰ UTC: ${cleanedIso}Z -> Colombia: ${formatted}`);
     return formatted;
@@ -72,12 +52,27 @@ const formatTime = (isoString: string): string => {
     return 'N/A';
   }
 };
+// Helper puro para actualizar el estado de una orden en un array (no hook)
+export const updateOrderStatus = (
+  orders: KitchenOrder[],
+  orderId: string,
+  newStatus: OrderStatus
+): KitchenOrder[] => {
+  let found = false;
+  const updated = orders.map((order) => {
+    if (order.id === orderId) {
+      found = true;
+      return { ...order, status: newStatus };
+    }
+    return order;
+  });
+  return found ? updated : orders;
+};
 
 // Calculate total preparation time based on products
 // Formula: base_time = max(product_times), penalty = (quantity - 1) * factor, total = base + penalty
-const calculatePrepTime = (products: { preparationTime?: number; quantity: number }[]): number => {
+export const calculatePrepTime = (products: { preparationTime?: number; quantity: number }[]): number => {
   if (!products || products.length === 0) return 5; // Default 5 minutes
-  
   const baseTimes = products
     .map(p => (p.preparationTime || 5) * (p.quantity || 1))
     .sort((a, b) => b - a);
@@ -89,7 +84,7 @@ const calculatePrepTime = (products: { preparationTime?: number; quantity: numbe
 };
 
 // Map API Order to KitchenOrder format
-const mapApiOrderToKitchenOrder = (order: ApiOrder): KitchenOrder => {
+export const mapApiOrderToKitchenOrder = (order: ApiOrder): KitchenOrder => {
   const products = (order.items || []).map((item: any) => {
     const seconds = item.preparationTimeSeconds;
     const minutesFromSeconds = typeof seconds === 'number' ? Math.ceil(seconds / 60) : undefined;
@@ -120,6 +115,34 @@ const mapApiOrderToKitchenOrder = (order: ApiOrder): KitchenOrder => {
 };
 
 export const useKitchenOrders = () => {
+    // --- Extracción de funciones para evitar anidación profunda ---
+    const updateOrdersWithNew = (newOrder: KitchenOrder) => (prev: KitchenOrder[]) => {
+      const exists = prev.some((o: KitchenOrder) => o.id === newOrder.id);
+      if (exists) {
+        return prev.map((o: KitchenOrder) => (o.id === newOrder.id ? newOrder : o));
+      }
+      // Add new orders at the beginning so they appear first
+      return [newOrder, ...prev];
+    };
+
+    const updateOrdersWithUpdated = (updatedOrder: KitchenOrder) => (prev: KitchenOrder[]) => {
+      const exists = prev.some((o: KitchenOrder) => o.fullId === updatedOrder.fullId);
+      if (exists) {
+        // Update existing order while preserving status if it's more advanced
+        return prev.map((o: KitchenOrder) => {
+          if (o.fullId === updatedOrder.fullId) {
+            const statusRank = { 'Nueva Orden': 0, 'Preparando': 1, 'Listo': 2, 'Finalizada': 3, 'Cancelada': 99 };
+            const existingRank = statusRank[o.status] || 0;
+            const updatedRank = statusRank[updatedOrder.status] || 0;
+            // Keep existing status if more advanced, otherwise use updated
+            return existingRank > updatedRank ? { ...updatedOrder, status: o.status } : updatedOrder;
+          }
+          return o;
+        });
+      }
+      // If order doesn't exist, add it
+      return [updatedOrder, ...prev];
+    };
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -194,36 +217,12 @@ export const useKitchenOrders = () => {
 
             if (msg.type === 'ORDER_NEW' && msg.order) {
               const newOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
-                const exists = prev.some((o: KitchenOrder) => o.id === newOrder.id);
-                if (exists) {
-                  return prev.map((o: KitchenOrder) => (o.id === newOrder.id ? newOrder : o));
-                }
-                // Add new orders at the beginning so they appear first
-                return [newOrder, ...prev];
-              });
+              setOrders(updateOrdersWithNew(newOrder));
             }
 
             if (msg.type === 'ORDER_UPDATED' && msg.order) {
               const updatedOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
-                const exists = prev.some((o: KitchenOrder) => o.fullId === updatedOrder.fullId);
-                if (exists) {
-                  // Update existing order while preserving status if it's more advanced
-                  return prev.map((o: KitchenOrder) => {
-                    if (o.fullId === updatedOrder.fullId) {
-                      const statusRank = { 'Nueva Orden': 0, 'Preparando': 1, 'Listo': 2, 'Finalizada': 3, 'Cancelada': 99 };
-                      const existingRank = statusRank[o.status] || 0;
-                      const updatedRank = statusRank[updatedOrder.status] || 0;
-                      // Keep existing status if more advanced, otherwise use updated
-                      return existingRank > updatedRank ? { ...updatedOrder, status: o.status } : updatedOrder;
-                    }
-                    return o;
-                  });
-                }
-                // If order doesn't exist, add it
-                return [updatedOrder, ...prev];
-              });
+              setOrders(updateOrdersWithUpdated(updatedOrder));
             }
 
             if (msg.type === 'ORDER_READY' && msg.id) {

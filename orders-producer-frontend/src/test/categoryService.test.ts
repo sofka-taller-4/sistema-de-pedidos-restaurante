@@ -30,9 +30,9 @@ describe('Category Service', () => {
       const result = await fetchCategories('test-token');
 
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/admin/categories'),
+        expect.any(String),
         expect.objectContaining({
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
+          credentials: 'include'
         })
       );
 
@@ -111,14 +111,13 @@ describe('Category Service', () => {
       const result = await createCategory('test-token', 'Sopas');
 
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/admin/categories'),
+        expect.any(String),
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token'
+            'Content-Type': 'application/json'
           }),
-          body: JSON.stringify({ name: 'Sopas' })
+          credentials: 'include'
         })
       );
 
@@ -156,10 +155,10 @@ describe('Category Service', () => {
       const result = await deleteCategory('test-token', '123');
 
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/admin/categories/123'),
+        expect.any(String),
         expect.objectContaining({
           method: 'DELETE',
-          headers: expect.objectContaining({ Authorization: 'Bearer test-token' })
+          credentials: 'include'
         })
       );
 

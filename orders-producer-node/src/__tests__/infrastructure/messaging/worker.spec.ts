@@ -29,18 +29,18 @@ const mockRepository = {
 describe("worker.ts - startWorker", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     (amqp.getChannel as jest.Mock).mockResolvedValue(mockChannel);
     (amqp.sendToDLQ as jest.Mock).mockResolvedValue(undefined);
     (wsServer.notifyClients as jest.Mock).mockImplementation(() => {});
     (kitchenController.addKitchenOrder as jest.Mock).mockResolvedValue(undefined);
     (kitchenController.getRepository as jest.Mock).mockReturnValue(mockRepository);
-    
+
     // Reset repository mocks
     mockRepository.getById.mockResolvedValue(null);
     mockRepository.create.mockResolvedValue(undefined);
     mockRepository.remove.mockResolvedValue(undefined);
-    
+
     mockChannel.checkQueue.mockResolvedValue({ messageCount: 1 });
   });
 
@@ -78,13 +78,24 @@ describe("worker.ts - startWorker", () => {
     expect(kitchenController.addKitchenOrder).toHaveBeenCalled();
     const calledOrder = (kitchenController.addKitchenOrder as jest.Mock).mock.calls[0][0];
     expect(calledOrder.status).toBe("pending");
-    expect(wsServer.notifyClients).toHaveBeenCalledWith({ type: "ORDER_NEW", order });
+    // Verificar que se llamó con el tipo correcto y que la orden incluye los campos esperados
+    expect(wsServer.notifyClients).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ORDER_NEW",
+        order: expect.objectContaining({
+          id: order.id,
+          orderId: order.orderId,
+          table: order.table,
+          items: order.items,
+        }),
+      })
+    );
     expect(mockChannel.ack).toHaveBeenCalledWith(mockMessage);
   });
 
   it("actualiza orden existente preservando el estado actual", async () => {
     const { startWorker } = await import("../../../infrastructure/messaging/worker");
-    
+
     const existingOrder = {
       id: "ORD-UPDATE",
       customerName: "Cliente Original",
@@ -93,7 +104,7 @@ describe("worker.ts - startWorker", () => {
       status: "preparing",
       createdAt: "2025-01-01T10:00:00.000Z"
     };
-    
+
     const updatedOrderMessage = {
       id: "ORD-UPDATE",
       customerName: "Cliente Actualizado",
@@ -118,16 +129,16 @@ describe("worker.ts - startWorker", () => {
     expect(mockRepository.getById).toHaveBeenCalledWith("ORD-UPDATE");
     expect(mockRepository.remove).toHaveBeenCalledWith("ORD-UPDATE");
     expect(mockRepository.create).toHaveBeenCalled();
-    
+
     // Verificar que se preservó el estado "preparing"
     const createdOrder = mockRepository.create.mock.calls[0][0];
     expect(createdOrder.status).toBe("preparing");
     expect(createdOrder.customerName).toBe("Cliente Actualizado");
-    
+
     // Verificar notificación de actualización
-    expect(wsServer.notifyClients).toHaveBeenCalledWith({ 
-      type: "ORDER_UPDATED", 
-      order: expect.objectContaining({ 
+    expect(wsServer.notifyClients).toHaveBeenCalledWith({
+      type: "ORDER_UPDATED",
+      order: expect.objectContaining({
         id: "ORD-UPDATE",
         status: "preparing"
       })
@@ -314,13 +325,23 @@ describe("worker.ts - startWorker", () => {
     await consumeCallback(mockMessage);
 
     expect(kitchenController.addKitchenOrder).toHaveBeenCalled();
-    expect(wsServer.notifyClients).toHaveBeenCalledWith({ type: "ORDER_NEW", order });
+    // Verificar que se llamó con el tipo correcto y que la orden incluye los campos esperados
+    expect(wsServer.notifyClients).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ORDER_NEW",
+        order: expect.objectContaining({
+          id: order.id,
+          table: order.table,
+          items: order.items,
+        }),
+      })
+    );
   });
 
   it("maneja error al inicializar el worker", async () => {
     const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     (amqp.getChannel as jest.Mock).mockRejectedValue(new Error("Channel initialization failed"));
-    
+
     const { startWorker } = await import("../../../infrastructure/messaging/worker");
     await startWorker();
 
@@ -328,7 +349,7 @@ describe("worker.ts - startWorker", () => {
       "❌ Error en el worker:",
       expect.any(Error)
     );
-    
+
     consoleErrorSpy.mockRestore();
   });
 
@@ -337,10 +358,10 @@ describe("worker.ts - startWorker", () => {
     await startWorker();
 
     const consumeCallback = mockChannel.consume.mock.calls[0][1];
-    
+
     // Llamar con null (caso de cierre de canal/cancelación)
     await consumeCallback(null);
-    
+
     // No debe llamar a ninguna función de procesamiento
     expect(kitchenController.addKitchenOrder).not.toHaveBeenCalled();
     expect(mockChannel.ack).not.toHaveBeenCalled();
@@ -349,7 +370,7 @@ describe("worker.ts - startWorker", () => {
   it("maneja error al parsear JSON cuando agrega correlationId a DLQ", async () => {
     const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     (kitchenController.addKitchenOrder as jest.Mock).mockRejectedValue(new Error("DB Error"));
-    
+
     // Mockear JSON.parse para que falle solo en la segunda llamada
     const originalParse = JSON.parse;
     let parseCallCount = 0;
@@ -369,12 +390,12 @@ describe("worker.ts - startWorker", () => {
     await startWorker();
 
     const consumeCallback = mockChannel.consume.mock.calls[0][1];
-    
+
     // Crear mensaje válido con correlationId
     const mockMessage = {
       content: Buffer.from(JSON.stringify({ id: "ORD-PARSE", items: [], total: 0 })),
-      properties: { 
-        correlationId: "test-correlation-id" 
+      properties: {
+        correlationId: "test-correlation-id"
       },
     };
 

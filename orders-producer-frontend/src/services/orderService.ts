@@ -77,29 +77,43 @@ export async function updateOrder(
       body: JSON.stringify(updates),
     });
 
-    // Check if response is JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('Non-JSON response:', text.substring(0, 200));
-      throw new Error(`Server returned non-JSON response (${response.status}). Check if the endpoint exists.`);
-    }
-
-    const data = await response.json();
-
+    // ✅ 1. SI ES ERROR HTTP → LEER BODY
     if (!response.ok) {
-      throw new Error(data.error?.message || data.error || data.detail || 'Error al actualizar pedido');
+      let data: any = null;
+
+      try {
+        data = await response.json();
+      } catch {
+      // ignoramos error de parseo
+      }
+      throw new Error(
+     data?.error?.message ||
+     data?.error ||
+     data?.detail ||
+     'Server error'
+  );
     }
 
-    return data;
+    // ✅ 2. SOLO SI ES OK, VALIDAR CONTENT-TYPE
+    const contentType =
+      response.headers && typeof response.headers.get === 'function'
+        ? response.headers.get('content-type')
+        : null;
+
+    if (!contentType || !contentType.includes('application/json')) {
+      if (response.text) await response.text();
+      throw new Error('Non-JSON response');
+    }
+
+    return await response.json();
   } catch (error) {
     if (error instanceof Error) {
-      console.error('Update order error:', error.message);
       throw error;
     }
-    throw new Error('Error desconocido al actualizar pedido');
+    throw new Error('Server error');
   }
 }
+
 
 /**
  * Update order status through the API Gateway
