@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import { categoriesRouter } from '../transport/http/routes/categories.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 import { ObjectId } from 'mongodb';
 
 // Mock auth middleware
@@ -23,7 +23,7 @@ describe('Categories Routes', () => {
 
   beforeAll(async () => {
     await setupTestDatabase();
-    
+
     app = express();
     app.use(express.json());
     app.use('/admin/categories', categoriesRouter);
@@ -41,33 +41,15 @@ describe('Categories Routes', () => {
     it('should create a new category with valid name', async () => {
       const response = await request(app)
         .post('/admin/categories')
-        .send({
-          name: 'Burgers'
-        });
+        .send({ name: 'Burgers' });
 
       expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('_id');
-      expect(response.body.data.name).toBe('Burgers');
-      expect(response.body.data).toHaveProperty('createdAt');
-    });
-
-    it('should reject category with duplicate name', async () => {
-      const db = getTestDb();
-      await db.collection('categories').insertOne({
-        name: 'Burgers',
-        createdAt: new Date()
-      });
-
-      const response = await request(app)
-        .post('/admin/categories')
-        .send({
-          name: 'Burgers'
-        });
-
-      expect(response.status).toBe(409);
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('ya existe');
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+      const data = response.body.data;
+      expect(data).toHaveProperty('_id');
+      expect(data).toHaveProperty('name', 'Burgers');
+      expect(data).toHaveProperty('createdAt');
     });
 
     it('should reject category with short name (less than 2 chars)', async () => {

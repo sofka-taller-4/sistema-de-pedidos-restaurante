@@ -1,10 +1,18 @@
 import request from 'supertest';
 import express from 'express';
+
+
 import jwt from 'jsonwebtoken';
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-local';
 
 // Mock auth middleware - define BEFORE imports
+
+// Helper to create admin token
+const createAdminToken = () => {
+  return jwt.sign({ sub: '123', email: 'admin@example.com', roles: ['admin'] }, JWT_SECRET, { expiresIn: '1h' });
+};
 jest.mock('../transport/http/middlewares/auth', () => ({
   requireAuth: (req: any, _res: any, next: any) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -36,10 +44,7 @@ const app = express();
 app.use(express.json());
 app.use('/admin/dashboard', dashboardRouter);
 
-// Helper to create admin token
-const createAdminToken = () => {
-  return jwt.sign({ sub: '123', email: 'admin@example.com', roles: ['admin'] }, JWT_SECRET, { expiresIn: '1h' });
-};
+
 
 describe('Dashboard Routes', () => {
   beforeAll(async () => {
@@ -72,7 +77,7 @@ describe('Dashboard Routes', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.byStatus).toBeDefined();
       expect(response.body.data.recent).toBeDefined();
-      
+
       const byStatus = response.body.data.byStatus;
       expect(byStatus.some((item: any) => item._id === 'pending' && item.count === 2)).toBe(true);
       expect(byStatus.some((item: any) => item._id === 'completed' && item.count === 1)).toBe(true);
@@ -95,7 +100,7 @@ describe('Dashboard Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.recent).toHaveLength(10); // Limit 10
-      
+
       // Verify sorted descending
       const recent = response.body.data.recent;
       expect(recent[0].orderId).toBe(1); // Most recent
