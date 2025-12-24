@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 os.environ["CLOUDAMQP_URL"] = "amqp://guest:guest@localhost:5672/"
 
 # Mock de publish_order para evitar conexión real a RabbitMQ
@@ -98,3 +99,307 @@ def test_create_order_with_valid_customer_name_with_spaces(order_service):
     assert order_in.customerName == "Juan Pérez"
     order = order_service.create_order(order_in)
     assert order.customerName == "Juan Pérez"
+
+# ============================================================================
+# MISSING COVERAGE TESTS
+# ============================================================================
+
+# Test 1: Verify get_order retrieves created orders
+def test_get_order_returns_created_order(order_service, sample_order_in):
+    """
+    Test that verifies get_order can retrieve a previously created order.
+    This ensures persistence is working correctly.
+    """
+    # Arrange
+    created = order_service.create_order(sample_order_in)
+    
+    # Act
+    retrieved = order_service.get_order(created.id)
+    
+    # Assert
+    assert retrieved is not None, "Order should be retrievable after creation"
+    assert retrieved.id == created.id
+    assert retrieved.customerName == created.customerName
+    assert retrieved.table == created.table
+    assert len(retrieved.items) == len(created.items)
+
+
+# Test 2: get_order returns None for non-existent order
+def test_get_order_returns_none_for_invalid_id(order_service):
+    """
+    Test boundary condition: get_order should return None for non-existent IDs
+    rather than raising an exception.
+    """
+    # Act
+    result = order_service.get_order("non-existent-id-12345")
+    
+    # Assert
+    assert result is None, "Should return None for non-existent order ID"
+
+
+# Test 3: Validate items list is not empty
+def test_create_order_with_empty_items_list_fails(order_service):
+    """
+    Business rule: Orders must have at least one item.
+    This validates the model-level validation.
+    """
+    from pydantic import ValidationError
+    
+    # Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        OrderIn(
+            customerName="Juan",
+            table="Mesa 1",
+            items=[]  # Empty list - should fail
+        )
+    
+    assert "items must not be empty" in str(exc_info.value)
+
+
+# Test 4a: Validate quantity must be positive
+def test_create_order_item_with_zero_quantity_fails():
+    """
+    Business rule: Item quantity must be greater than 0.
+    Validates the conint(gt=0) constraint in OrderItem model.
+    """
+    from pydantic import ValidationError
+    
+    # Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        OrderItem(productName="Pizza", quantity=0, unitPrice=10000)
+    
+    # Verify the error is about quantity constraint
+    assert "quantity" in str(exc_info.value).lower()
+
+
+# Test 4b: Validate quantity must be positive (negative case)
+def test_create_order_item_with_negative_quantity_fails():
+    """
+    Business rule: Item quantity cannot be negative.
+    Additional validation for conint(gt=0) constraint.
+    """
+    from pydantic import ValidationError
+    
+    # Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        OrderItem(productName="Pizza", quantity=-5, unitPrice=10000)
+    
+    assert "quantity" in str(exc_info.value).lower()
+
+
+# Test 4c: Validate price cannot be negative
+def test_create_order_item_with_negative_price_fails():
+    """
+    Business rule: Item price cannot be negative.
+    Validates the confloat(ge=0) constraint in OrderItem model.
+    """
+    from pydantic import ValidationError
+    
+    # Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        OrderItem(productName="Pizza", quantity=1, unitPrice=-5000)
+    
+    assert "unitPrice" in str(exc_info.value).lower() or "price" in str(exc_info.value).lower()
+
+
+# Test 4d: Validate price can be zero (edge case)
+def test_create_order_item_with_zero_price_succeeds():
+    """
+    Edge case: Price of zero should be allowed (confloat(ge=0)).
+    This might represent free items or promotional offers.
+    """
+    # Act
+    item = OrderItem(productName="Promotional Item", quantity=1, unitPrice=0)
+    
+    # Assert
+    assert item.unitPrice == 0
+    assert item.quantity == 1
+
+
+# Test 5: Update order preserves createdAt timestamp
+def test_update_order_preserves_creation_timestamp(order_service, sample_order_in):
+    """
+    Verify that updating an order does not modify the original creation timestamp.
+    This is an immutable field that should remain constant.
+    """
+    import time
+    
+    # Arrange
+    original = order_service.create_order(sample_order_in)
+    original_timestamp = original.createdAt
+    
+    # Act - Wait a moment to ensure different timestamp would be generated if not preserved
+    time.sleep(0.01)
+    new_order_in = OrderIn(
+        customerName="Updated Name",
+        table="Mesa 2",
+        items=[OrderItem(productName="Pizza", quantity=3, unitPrice=15000)]
+    )
+    updated = order_service.update_order(original.id, new_order_in)
+    
+    # Assert
+    assert updated.createdAt == original_timestamp, "createdAt should remain unchanged after update"
+    assert updated.customerName == "Updated Name", "Other fields should be updated"
+    assert updated.table == "Mesa 2"
+
+
+# Test 5b: Multiple updates preserve original timestamp
+def test_multiple_updates_preserve_original_timestamp(order_service, sample_order_in):
+    """
+    Extended test: Multiple consecutive updates should all preserve the original timestamp.
+    """
+    import time
+    
+    # Arrange
+    original = order_service.create_order(sample_order_in)
+    original_timestamp = original.createdAt
+    
+    # Act - Perform multiple updates
+    for i in range(3):
+        time.sleep(0.01)
+        new_order_in = OrderIn(
+            customerName=f"Updated Name {i}",
+            table=f"Mesa {i}",
+            items=[OrderItem(productName=f"Item{i}", quantity=1, unitPrice=5000)]
+        )
+        updated = order_service.update_order(original.id, new_order_in)
+    
+    # Assert
+    assert updated.createdAt == original_timestamp, "createdAt should remain unchanged after multiple updates" 
+
+# ============================================================================
+# TDD approach
+# ============================================================================
+
+def test_order_total_single_item(order_service):
+    """
+    TDD RED: Calculate total for order with single item.
+    Formula: quantity * unitPrice
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[OrderItem(productName="Hamburguesa", quantity=2, unitPrice=15000)]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    expected_total = Decimal(2 * 15000)  # 30000
+    assert order.total == expected_total
+
+def test_order_total_multiple_items(order_service):
+    """
+    TDD: Calculate total for order with multiple different items.
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Hamburguesa", quantity=2, unitPrice=15000),
+            OrderItem(productName="Papas", quantity=1, unitPrice=8000),
+            OrderItem(productName="Gaseosa", quantity=3, unitPrice=5000)
+        ]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    expected_total = (2 * 15000) + (1 * 8000) + (3 * 5000)  # 30000 + 8000 + 15000 = 53000
+    assert order.total == expected_total
+
+def test_order_total_with_zero_price_item(order_service):
+    """
+    TDD: Calculate total when one item has zero price (promotional item).
+    """
+    # Arrange
+    order_in = OrderIn(
+        customerName="Test Customer",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Hamburguesa", quantity=1, unitPrice=15000),
+            OrderItem(productName="Promotional Gift", quantity=1, unitPrice=0)
+        ]
+    )
+    
+    # Act
+    order = order_service.create_order(order_in)
+    
+    # Assert
+    assert order.total == 15000  # Only the hamburger counts
+
+def test_order_total_calculates_even_after_update(order_service, sample_order_in):
+    """
+    TDD: Verify total recalculates correctly after order update.
+    """
+    # Arrange
+    original = order_service.create_order(sample_order_in)
+    original_total = original.total
+    
+    # Act - Update with different items
+    new_order_in = OrderIn(
+        customerName="Updated",
+        table="Mesa 2",
+        items=[
+            OrderItem(productName="Pizza", quantity=3, unitPrice=20000)
+        ]
+    )
+    updated = order_service.update_order(original.id, new_order_in)
+    
+    # Assert
+    assert updated.total == 3 * 20000  # 60000
+    assert updated.total != original_total
+
+# Part of the refactor process: TDD proves to be flexible
+def test_order_item_count(order_service):
+    """Test total item count calculation."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Burger", quantity=2, unitPrice=15000),
+            OrderItem(productName="Fries", quantity=3, unitPrice=8000)
+        ]
+    )
+    order = order_service.create_order(order_in)
+    assert order.item_count == 5  # 2 + 3
+
+def test_order_unique_products(order_service):
+    """Test unique product count."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[
+            OrderItem(productName="Burger", quantity=2, unitPrice=15000),
+            OrderItem(productName="Fries", quantity=3, unitPrice=8000)
+        ]
+    )
+    order = order_service.create_order(order_in)
+    assert order.unique_products == 2
+
+def test_get_item_by_product_found(order_service):
+    """Test finding an item by product name."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[OrderItem(productName="Burger", quantity=2, unitPrice=15000)]
+    )
+    order = order_service.create_order(order_in)
+    item = order.get_item_by_product("Burger")
+    assert item is not None
+    assert item.quantity == 2
+
+def test_get_item_by_product_not_found(order_service):
+    """Test finding non-existent product."""
+    order_in = OrderIn(
+        customerName="Test",
+        table="Mesa 1",
+        items=[OrderItem(productName="Burger", quantity=2, unitPrice=15000)]
+    )
+    order = order_service.create_order(order_in)
+    item = order.get_item_by_product("Pizza")
+    assert item is None
