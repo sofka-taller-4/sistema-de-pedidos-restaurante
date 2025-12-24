@@ -256,10 +256,12 @@
           ]
         };
         vi.spyOn(orderService, 'getKitchenOrders').mockResolvedValue({ success: true, data: [mockApiOrder] });
+        let result;
         await act(async () => {
-          renderHook(() => useKitchenOrders());
+          ({ result } = renderHook(() => useKitchenOrders()));
           await new Promise((r) => setTimeout(r, 30));
         });
+        expect(result.current.orders).toBeDefined();
         // @ts-ignore
         global.WebSocket = originalWebSocket;
       });
