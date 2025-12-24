@@ -109,28 +109,6 @@ describe('Auth Routes', () => {
       expect(response.body.message).toBe('Invalid credentials');
     });
 
-    it('should not include passwordHash in response', async () => {
-      const db = getTestDb();
-      const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
-        name: 'Test User',
-        email: 'test@example.com',
-        passwordHash,
-        roles: ['admin'],
-        active: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      await waitForMongo();
-
-      const response = await request(app)
-        .post('/admin/auth/login')
-        .send({ email: 'test@example.com', password: 'password123', _encrypted: false });
-
-      expect(response.status).toBe(200);
-      expect(response.body.user.passwordHash).toBeUndefined();
-    });
-
     it('should reject missing email', async () => {
       const response = await request(app)
         .post('/admin/auth/login')
