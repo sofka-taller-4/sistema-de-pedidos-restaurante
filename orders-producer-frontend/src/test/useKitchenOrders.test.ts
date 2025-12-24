@@ -104,6 +104,7 @@
         await act(async () => {
           await result.current.startCooking('ID1');
         });
+        expect(result.current.orders.length).toBeGreaterThan(0);
       });
       it('markAsReady maneja error de API', async () => {
         vi.spyOn(orderService, 'getKitchenOrders').mockResolvedValue({ success: true, data: [{ id: 'id2', customerName: 'B', createdAt: new Date().toISOString(), table: '2', status: 'preparing', items: [] }] });
@@ -116,6 +117,7 @@
         await act(async () => {
           await result.current.markAsReady('ID2');
         });
+        expect(result.current.orders.length).toBeGreaterThan(0);
       });
       it('completeOrder maneja error de API', async () => {
         vi.spyOn(orderService, 'getKitchenOrders').mockResolvedValue({ success: true, data: [{ id: 'id3', customerName: 'C', createdAt: new Date().toISOString(), table: '3', status: 'preparing', items: [] }] });
@@ -128,6 +130,7 @@
         await act(async () => {
           await result.current.completeOrder('ID3');
         });
+        expect(result.current.orders.length).toBeGreaterThan(0);
       });
       it('startCooking, markAsReady, completeOrder con orderId inexistente', async () => {
         vi.spyOn(orderService, 'getKitchenOrders').mockResolvedValue({ success: true, data: [] });
@@ -141,6 +144,7 @@
           await result.current.markAsReady('no-existe');
           await result.current.completeOrder('no-existe');
         });
+        expect(result.current.orders.length).toBe(0);
       });
     });
     import { vi } from 'vitest';
@@ -252,10 +256,12 @@
           ]
         };
         vi.spyOn(orderService, 'getKitchenOrders').mockResolvedValue({ success: true, data: [mockApiOrder] });
+        let result;
         await act(async () => {
-          renderHook(() => useKitchenOrders());
+          ({ result } = renderHook(() => useKitchenOrders()));
           await new Promise((r) => setTimeout(r, 30));
         });
+        expect(result.current.orders).toBeDefined();
         // @ts-ignore
         global.WebSocket = originalWebSocket;
       });

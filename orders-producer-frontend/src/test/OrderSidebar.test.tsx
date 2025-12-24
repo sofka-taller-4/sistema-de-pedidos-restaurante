@@ -127,6 +127,8 @@ describe('OrderSidebar', () => {
       fireEvent.click(btn);
     });
     expect(onSend).not.toHaveBeenCalled();
+    // Aserción adicional: el botón debe seguir habilitado o mostrar algún mensaje
+    expect(btn).toBeDisabled();
   });
 
   it('llama a onSend correctamente y limpia los estados', async () => {
