@@ -1,27 +1,20 @@
-import * as UserService from '../../src/services/UserService';
-import { AdminProxyService } from '../../src/services/AdminProxyService';
+// Mock del AdminProxyService antes de importar UserService
+const mockForward = jest.fn();
 
-// Mock del AdminProxyService
-jest.mock('../../src/services/AdminProxyService');
+jest.mock('../../src/services/AdminProxyService', () => {
+  return {
+    AdminProxyService: jest.fn().mockImplementation(() => ({
+      forward: mockForward,
+    })),
+  };
+});
 
-const MockedAdminProxyService = AdminProxyService as jest.MockedClass<typeof AdminProxyService>;
+import { getUserByEmail, getUserById, updateUserPassword } from '../../src/services/UserService';
 
 describe('UserService', () => {
-  let mockAdminProxy: jest.Mocked<AdminProxyService>;
-
   beforeEach(() => {
     // Resetear mocks antes de cada test
     jest.clearAllMocks();
-    
-    // Crear mock instance
-    mockAdminProxy = {
-      forward: jest.fn(),
-      getServiceName: jest.fn(),
-      getBaseURL: jest.fn(),
-    } as any;
-    
-    // Configurar el constructor mock para retornar nuestra instancia mock
-    MockedAdminProxyService.mockImplementation(() => mockAdminProxy);
   });
 
   describe('getUserByEmail', () => {
@@ -37,14 +30,14 @@ describe('UserService', () => {
         config: {} as any
       };
       
-      mockAdminProxy.forward.mockResolvedValue(mockResponse);
+      mockForward.mockResolvedValue(mockResponse);
 
       // Act
       const result = await getUserByEmail(email);
 
       // Assert
       expect(result).toEqual(expectedUserData);
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/email/${encodeURIComponent(email)}`,
         'GET'
       );
@@ -53,14 +46,14 @@ describe('UserService', () => {
     it('debe retornar null cuando la petición falla', async () => {
       // Arrange
       const email = 'test@example.com';
-      mockAdminProxy.forward.mockRejectedValue(new Error('Network error'));
+      mockForward.mockRejectedValue(new Error('Network error'));
 
       // Act
       const result = await getUserByEmail(email);
 
       // Assert
       expect(result).toBeNull();
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/email/${encodeURIComponent(email)}`,
         'GET'
       );
@@ -76,13 +69,13 @@ describe('UserService', () => {
         headers: {},
         config: {} as any
       };
-      mockAdminProxy.forward.mockResolvedValue(mockResponse);
+      mockForward.mockResolvedValue(mockResponse);
 
       // Act
       await getUserByEmail(email);
 
       // Assert
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/email/${encodeURIComponent(email)}`,
         'GET'
       );
@@ -102,14 +95,14 @@ describe('UserService', () => {
         config: {} as any
       };
       
-      mockAdminProxy.forward.mockResolvedValue(mockResponse);
+      mockForward.mockResolvedValue(mockResponse);
 
       // Act
       const result = await getUserById(userId);
 
       // Assert
       expect(result).toEqual(expectedUserData);
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}`,
         'GET'
       );
@@ -118,14 +111,14 @@ describe('UserService', () => {
     it('debe retornar null cuando la petición falla', async () => {
       // Arrange
       const userId = '123';
-      mockAdminProxy.forward.mockRejectedValue(new Error('User not found'));
+      mockForward.mockRejectedValue(new Error('User not found'));
 
       // Act
       const result = await getUserById(userId);
 
       // Assert
       expect(result).toBeNull();
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}`,
         'GET'
       );
@@ -146,14 +139,14 @@ describe('UserService', () => {
         config: {} as any
       };
       
-      mockAdminProxy.forward.mockResolvedValue(mockResponse);
+      mockForward.mockResolvedValue(mockResponse);
 
       // Act
       const result = await updateUserPassword(userId, newPassword);
 
       // Assert
       expect(result).toEqual(expectedResponse);
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}/password`,
         'PUT',
         { password: newPassword }
@@ -166,11 +159,11 @@ describe('UserService', () => {
       const newPassword = 'newPassword';
       const error = new Error('Update failed');
       
-      mockAdminProxy.forward.mockRejectedValue(error);
+      mockForward.mockRejectedValue(error);
 
       // Act & Assert
       await expect(updateUserPassword(userId, newPassword)).rejects.toThrow('Update failed');
-      expect(mockAdminProxy.forward).toHaveBeenCalledWith(
+      expect(mockForward).toHaveBeenCalledWith(
         `/admin/users/${userId}/password`,
         'PUT',
         { password: newPassword }
