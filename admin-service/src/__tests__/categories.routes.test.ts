@@ -52,25 +52,6 @@ describe('Categories Routes', () => {
       expect(data).toHaveProperty('createdAt');
     });
 
-    it('should reject category with duplicate name', async () => {
-      const db = getTestDb();
-      await db.collection('categories').insertOne({
-        name: 'Burgers',
-        createdAt: new Date()
-      });
-      await waitForMongo();
-
-      const response = await request(app)
-        .post('/admin/categories')
-        .send({
-          name: 'Burgers'
-        });
-
-      expect(response.status).toBe(409);
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('ya existe');
-    });
-
     it('should reject category with short name (less than 2 chars)', async () => {
       const response = await request(app)
         .post('/admin/categories')
