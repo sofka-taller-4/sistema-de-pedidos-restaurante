@@ -74,8 +74,7 @@ export const useActiveOrders = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Connect to WebSocket
-  // @ts-expect-error WebSocket hook typings compatible with runtime
-  const { lastMessage, isConnected } = useWebSocket();
+  const { isConnected } = useWebSocket();
 
   const fetchActiveOrders = useCallback(async () => {
     console.log('🔍 fetchActiveOrders called'); // 👈 AGREGA ESTE LOG
@@ -123,17 +122,18 @@ export const useActiveOrders = () => {
   }, [fetchActiveOrders]);
 
 
+  // Helper para actualizar timeRemaining
+  const updateTimeRemaining = (orders: ActiveOrder[]) =>
+    orders.map(order => ({
+      ...order,
+      timeRemaining: calculateTimeElapsed(order.createdAt),
+    }));
+
   // Update time remaining every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveOrders(prevOrders => 
-        prevOrders.map(order => ({
-          ...order,
-          timeRemaining: calculateTimeElapsed(order.createdAt),
-        }))
-      );
+      setActiveOrders(updateTimeRemaining);
     }, 30000);
-
     return () => clearInterval(interval);
   }, []);
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getKitchenOrders, updateOrderStatus as updateOrderStatusAPI } from '../services/orderService';
-import type { ApiOrder } from '../types/order';
+import type { ApiOrder, KitchenOrder } from '../types/order';
 import type { OrderStatus } from '../components/KitchenOrderCard';
 
 // Get WebSocket URL from environment variables
@@ -189,19 +189,20 @@ export const useKitchenOrders = () => {
 
             if (msg.type === 'ORDER_NEW' && msg.order) {
               const newOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
+              const updateOrdersWithNew = (prev: KitchenOrder[]) => {
                 const exists = prev.some((o: KitchenOrder) => o.id === newOrder.id);
                 if (exists) {
                   return prev.map((o: KitchenOrder) => (o.id === newOrder.id ? newOrder : o));
                 }
                 // Add new orders at the beginning so they appear first
                 return [newOrder, ...prev];
-              });
+              };
+              setOrders(updateOrdersWithNew);
             }
 
             if (msg.type === 'ORDER_UPDATED' && msg.order) {
               const updatedOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
+              const updateOrdersWithUpdated = (prev: KitchenOrder[]) => {
                 const exists = prev.some((o: KitchenOrder) => o.fullId === updatedOrder.fullId);
                 if (exists) {
                   // Update existing order while preserving status if it's more advanced
@@ -218,7 +219,8 @@ export const useKitchenOrders = () => {
                 }
                 // If order doesn't exist, add it
                 return [updatedOrder, ...prev];
-              });
+              };
+              setOrders(updateOrdersWithUpdated);
             }
 
             if (msg.type === 'ORDER_READY' && msg.id) {
