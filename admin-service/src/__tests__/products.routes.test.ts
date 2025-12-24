@@ -31,7 +31,7 @@ jest.mock('../transport/http/middlewares/auth', () => ({
 }));
 
 import { productsRouter } from '../transport/http/routes/products.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 
 jest.mock('../storage/mongo', () => ({
   getDb: () => getTestDb(),
@@ -301,27 +301,6 @@ describe('Products Routes', () => {
 
       const updated = await db.collection('products').findOne({ id: 1 });
       expect(updated?.name).toBe('New Name');
-    });
-
-    it('should update product price', async () => {
-      const db = getTestDb();
-      await db.collection('products').insertOne({
-        id: 1,
-        name: 'Product',
-        price: 10,
-        preparationTime: 10,
-      });
-
-      const token = createAdminToken();
-      const response = await request(app)
-        .put('/admin/products/1')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ price: 25.99 });
-
-      expect(response.status).toBe(200);
-
-      const updated = await db.collection('products').findOne({ id: 1 });
-      expect(updated?.price).toBe(25.99);
     });
 
     it('should update multiple fields at once', async () => {

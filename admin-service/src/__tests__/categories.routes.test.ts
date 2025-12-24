@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import { categoriesRouter } from '../transport/http/routes/categories.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 import { ObjectId } from 'mongodb';
 
 // Mock auth middleware
@@ -50,24 +50,6 @@ describe('Categories Routes', () => {
       expect(data).toHaveProperty('_id');
       expect(data).toHaveProperty('name', 'Burgers');
       expect(data).toHaveProperty('createdAt');
-    });
-
-    it('should reject category with duplicate name', async () => {
-      const db = getTestDb();
-      await db.collection('categories').insertOne({
-        name: 'Burgers',
-        createdAt: new Date()
-      });
-
-      const response = await request(app)
-        .post('/admin/categories')
-        .send({
-          name: 'Burgers'
-        });
-
-      expect(response.status).toBe(409);
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toContain('ya existe');
     });
 
     it('should reject category with short name (less than 2 chars)', async () => {

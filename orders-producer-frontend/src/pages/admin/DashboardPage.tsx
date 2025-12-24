@@ -43,10 +43,17 @@ const DashboardPage: React.FC = () => {
     const fetchInitialData = async () => {
       if (!isAuthenticated) return;
       setLoading(true);
-      const { orders, metrics } = await fetchDashboard();
-      setSnapshot(orders.data);
-      setMetrics(metrics.data);
-      setLoading(false);
+      try {
+        const { orders, metrics } = await fetchDashboard();
+        setSnapshot(orders.data);
+        setMetrics(metrics.data);
+      } catch (err) {
+        // Fallback visual: snapshot vacío y métricas vacías
+        setSnapshot({ byStatus: [], recent: [] });
+        setMetrics({});
+      } finally {
+        setLoading(false);
+      }
     };
     fetchInitialData();
   }, [isAuthenticated]);
@@ -148,7 +155,7 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-10 p-8 bg-neutral-100 dark:bg-neutral-900 min-h-screen transition-colors pl-64">
       {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-10" role="status">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
         </div>
       )}
