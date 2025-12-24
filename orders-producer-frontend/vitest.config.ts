@@ -11,7 +11,7 @@ export default defineConfig({
     css: true,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'json'],
+      reporter: ['text', 'html', 'json', 'lcov'],
       include: ['src/components/KitchenHeader.tsx', 'src/**/*.{ts,tsx}'],
       exclude: [
         'src/test/**',
