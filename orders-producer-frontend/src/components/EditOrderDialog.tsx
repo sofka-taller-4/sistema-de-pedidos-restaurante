@@ -227,6 +227,7 @@ export function EditOrderDialog({ order, open, onClose, onSave, availableProduct
                             size="sm"
                             onClick={() => handleQuantityChange(index, -1)}
                             className="h-8 w-8 p-0"
+                            aria-label={`decrementar cantidad de ${item.productName}`}
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
@@ -238,6 +239,7 @@ export function EditOrderDialog({ order, open, onClose, onSave, availableProduct
                             size="sm"
                             onClick={() => handleQuantityChange(index, 1)}
                             className="h-8 w-8 p-0"
+                            aria-label={`incrementar cantidad de ${item.productName}`}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
@@ -252,6 +254,7 @@ export function EditOrderDialog({ order, open, onClose, onSave, availableProduct
                         size="sm"
                         onClick={() => handleRemoveItem(index)}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        aria-label={`eliminar ${item.productName}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -320,6 +323,7 @@ export function EditOrderDialog({ order, open, onClose, onSave, availableProduct
                       size="sm"
                       onClick={() => handleAddProduct(product)}
                       className="shrink-0"
+                      aria-label={`agregar ${product.name}`}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>

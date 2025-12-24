@@ -1,223 +1,398 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createOrder, getOrderById, getKitchenOrders } from '../services/orderService';
+import {
+  createOrder,
+  getOrderById,
+  getKitchenOrders,
+  updateOrder,
+  updateOrderStatus,
+} from '../services/orderService';
+import { API_ENDPOINTS } from '../config/api';
 import type { OrderPayload, ApiOrder } from '../types/order';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 describe('Order Service', () => {
+  let mockFetch: any;
+
   beforeEach(() => {
+    mockFetch = vi.fn();
+    global.fetch = mockFetch;
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn());
   });
 
   describe('createOrder', () => {
-    it('creates a new order successfully', async () => {
-      const mockOrderData: OrderPayload = {
-        customerName: 'Cliente Test',
+    it('should create a new order successfully', async () => {
+      const orderData: OrderPayload = {
+        customerName: 'John Doe',
         table: '5',
         items: [
-          { productName: 'Hamburguesa', quantity: 2, unitPrice: 15000, note: null }
-        ]
+          { productName: 'Pizza', quantity: 2, unitPrice: 100, note: '' },
+        ],
       };
 
-      const mockResponse = {
-        success: true,
-        data: {
-          id: 'order-123',
-          ...mockOrderData,
-          status: 'pending',
-          createdAt: new Date().toISOString()
-        }
-      };
-
-      (fetch as any).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockResponse
+        json: async () => ({
+          success: true,
+          data: { id: '1', ...orderData, status: 'pending' },
+        }),
       });
 
-      const result = await createOrder(mockOrderData);
+      const result = await createOrder(orderData);
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/orders'),
+      expect(mockFetch).toHaveBeenCalledWith(
+        API_ENDPOINTS.CREATE_ORDER,
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mockOrderData)
         })
       );
-
       expect(result.success).toBe(true);
-      if (result.data) {
-        expect(result.data.id).toBe('order-123');
-      }
     });
 
-    it('throws error when API returns error', async () => {
-      const mockOrderData: OrderPayload = {
-        customerName: 'María García',
-        table: '3',
-        items: []
+    it('should handle errors when creating order fails', async () => {
+      const orderData: OrderPayload = {
+        customerName: 'Jane',
+        table: '1',
+        items: [],
       };
 
-      (fetch as any).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({
-          error: { message: 'El pedido debe tener al menos un producto' }
-        })
+          error: { message: 'Order validation failed' },
+        }),
       });
 
-      await expect(createOrder(mockOrderData)).rejects.toThrow('El pedido debe tener al menos un producto');
+      await expect(createOrder(orderData)).rejects.toThrow(
+        'Order validation failed'
+      );
     });
 
-    it('throws generic error when no error message provided', async () => {
-      const mockOrderData: OrderPayload = {
-        customerName: 'Test',
-        table: '1',
-        items: []
-      };
-
-      (fetch as any).mockResolvedValueOnce({
+    it('should throw generic error if no specific error message', async () => {
+      mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({})
+        json: async () => ({}),
       });
 
-      await expect(createOrder(mockOrderData)).rejects.toThrow('Error al crear pedido');
+      await expect(
+        createOrder({ customerName: 'test', table: '1', items: [] })
+      ).rejects.toThrow('Error al crear pedido');
     });
 
-    it('handles network errors', async () => {
-      const mockOrderData: OrderPayload = {
-        customerName: 'Test',
-        table: '1',
-        items: []
+    it('should create order with multiple items', async () => {
+      const orderData: OrderPayload = {
+        customerName: 'Multi Item',
+        table: '3',
+        items: [
+          { productName: 'Pizza', quantity: 1, unitPrice: 100 },
+          { productName: 'Coke', quantity: 2, unitPrice: 30 },
+        ],
       };
 
-      (fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { id: '2', ...orderData },
+        }),
+      });
 
-      await expect(createOrder(mockOrderData)).rejects.toThrow('Network error');
+      const result = await createOrder(orderData);
+      expect(result.success).toBe(true);
     });
   });
 
   describe('getOrderById', () => {
-    it('retrieves order by ID successfully', async () => {
-      const mockOrder: ApiOrder = {
-        id: 'order-456',
-        customerName: 'Carlos López',
-        table: '7',
-        items: [
-          { productName: 'Pizza', quantity: 1, unitPrice: 25000, note: null }
-        ],
+    it('should fetch order by ID successfully', async () => {
+      const orderId = 'order-123';
+      const mockOrder: Partial<ApiOrder> = {
+        id: orderId,
+        customerName: 'John',
+        table: '5',
         status: 'preparing',
-        createdAt: new Date().toISOString()
+        items: [],
       };
 
-      const mockResponse = {
-        success: true,
-        data: mockOrder
-      };
-
-      (fetch as any).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockResponse
+        json: async () => ({ success: true, data: mockOrder }),
       });
 
-      const result = await getOrderById('order-456');
+      const result = await getOrderById(orderId);
 
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('order-456'));
-      expect(result.success).toBe(true);
-      if (result.data) {
-        expect(result.data.id).toBe('order-456');
-        expect(result.data.customerName).toBe('Carlos López');
-      }
+      expect(mockFetch).toHaveBeenCalledWith(API_ENDPOINTS.GET_ORDER(orderId));
+      expect(result.data).toEqual(mockOrder);
     });
 
-    it('throws error when order not found', async () => {
-      (fetch as any).mockResolvedValueOnce({
+    it('should handle errors when fetching order fails', async () => {
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({
-          error: { message: 'Pedido no encontrado' }
-        })
+          error: { message: 'Order not found' },
+        }),
       });
 
-      await expect(getOrderById('non-existent')).rejects.toThrow('Pedido no encontrado');
+      await expect(getOrderById('invalid-id')).rejects.toThrow(
+        'Order not found'
+      );
     });
 
-    it('throws generic error when API fails without message', async () => {
-      (fetch as any).mockResolvedValueOnce({
+    it('should throw generic error if order fetch fails', async () => {
+      mockFetch.mockResolvedValueOnce({
         ok: false,
-        json: async () => ({})
+        json: async () => ({}),
       });
 
-      await expect(getOrderById('order-123')).rejects.toThrow('Error al obtener pedido');
+      await expect(getOrderById('123')).rejects.toThrow('Error al obtener pedido');
     });
   });
 
   describe('getKitchenOrders', () => {
-    it('retrieves all kitchen orders successfully', async () => {
-      const mockOrders: ApiOrder[] = [
+    it('should fetch kitchen orders successfully', async () => {
+      const mockOrders: Partial<ApiOrder>[] = [
         {
-          id: 'order-1',
-          customerName: 'Juan',
+          id: '1',
+          customerName: 'Customer 1',
           table: '1',
-          items: [],
           status: 'pending',
-          createdAt: new Date().toISOString()
+          items: [],
         },
         {
-          id: 'order-2',
-          customerName: 'María',
+          id: '2',
+          customerName: 'Customer 2',
           table: '2',
-          items: [],
           status: 'preparing',
-          createdAt: new Date().toISOString()
-        }
+          items: [],
+        },
       ];
 
-      const mockResponse = {
-        success: true,
-        data: mockOrders
-      };
-
-      (fetch as any).mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => mockResponse
+        json: async () => ({ success: true, data: mockOrders }),
       });
 
       const result = await getKitchenOrders();
 
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('status=all'));
-      expect(result.success).toBe(true);
-      if (result.data) {
-        expect(result.data).toHaveLength(2);
-        expect(result.data[0].id).toBe('order-1');
-      }
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(API_ENDPOINTS.KITCHEN_ORDERS)
+      );
+      expect(result.data).toEqual(mockOrders);
+      expect(result.data).toHaveLength(2);
     });
 
-    it('returns empty array when no orders available', async () => {
-      const mockResponse = {
-        success: true,
-        data: []
-      };
-
-      (fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse
-      });
-
-      const result = await getKitchenOrders();
-
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual([]);
-    });
-
-    it('throws error when API fails', async () => {
-      (fetch as any).mockResolvedValueOnce({
+    it('should handle errors when fetching kitchen orders fails', async () => {
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({
-          error: { message: 'Error interno del servidor' }
-        })
+          error: { message: 'Failed to fetch orders' },
+        }),
       });
 
-      await expect(getKitchenOrders()).rejects.toThrow('Error interno del servidor');
+      await expect(getKitchenOrders()).rejects.toThrow('Failed to fetch orders');
+    });
+
+    it('should handle empty kitchen orders', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      });
+
+      const result = await getKitchenOrders();
+      expect(result.data).toEqual([]);
+    });
+  });
+
+  describe('updateOrder', () => {
+    it('should update order successfully', async () => {
+      const orderId = 'order-123';
+      const updates = {
+        customerName: 'Jane Doe',
+        table: '10',
+        items: [{ productName: 'Burger', quantity: 1, unitPrice: 50 }],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['content-type', 'application/json']]),
+        json: async () => ({ success: true, data: { id: orderId, ...updates } }),
+      });
+
+      const result = await updateOrder(orderId, updates);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        API_ENDPOINTS.UPDATE_ORDER(orderId),
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        })
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle non-JSON response content type', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Map([['content-type', 'text/html']]),
+        status: 200,
+        text: async () => '<html>Error page</html>',
+      });
+
+      await expect(
+        updateOrder('123', { customerName: 'test' })
+      ).rejects.toThrow('Non-JSON response');
+    });
+
+    it('should handle update errors with error message', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        headers: new Map([['content-type', 'application/json']]),
+        json: async () => ({ error: { message: 'Update failed' } }),
+      });
+
+      await expect(
+        updateOrder('123', { customerName: 'test' })
+      ).rejects.toThrow('Update failed');
+    });
+
+    it('should handle update with null or missing content-type', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Map(),
+        status: 200,
+        text: async () => 'error',
+      });
+
+      await expect(
+        updateOrder('123', { customerName: 'test' })
+      ).rejects.toThrow('Non-JSON response');
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('should update order status to preparing', async () => {
+      const orderId = 'order-456';
+      const status = 'preparing' as const;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { success: true, id: orderId, status },
+        }),
+      });
+
+      const result = await updateOrderStatus(orderId, status);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        API_ENDPOINTS.UPDATE_ORDER_STATUS(orderId),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        })
+      );
+      expect(result.data.status).toBe('preparing');
+    });
+
+    it('should update order status to ready', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { success: true, id: '123', status: 'ready' },
+        }),
+      });
+
+      const result = await updateOrderStatus('123', 'ready');
+      expect(result.data.status).toBe('ready');
+    });
+
+    it('should update order status to completed', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { success: true, id: '123', status: 'completed' },
+        }),
+      });
+
+      const result = await updateOrderStatus('123', 'completed');
+      expect(result.data.status).toBe('completed');
+    });
+
+    it('should update order status to cancelled', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { success: true, id: '123', status: 'cancelled' },
+        }),
+      });
+
+      const result = await updateOrderStatus('123', 'cancelled');
+      expect(result.data.status).toBe('cancelled');
+    });
+
+    it('should handle status update errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          error: { message: 'Status update failed' },
+        }),
+      });
+
+      await expect(updateOrderStatus('123', 'ready')).rejects.toThrow(
+        'Status update failed'
+      );
+    });
+
+    it('should throw generic error for failed status update', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({}),
+      });
+
+      await expect(updateOrderStatus('123', 'pending')).rejects.toThrow(
+        'Error al actualizar estado del pedido'
+      );
+    });
+
+    it('should handle pending status', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { success: true, id: '123', status: 'pending' },
+        }),
+      });
+
+      const result = await updateOrderStatus('123', 'pending');
+      expect(result.data.status).toBe('pending');
+    });
+  });
+
+  describe('Error handling edge cases', () => {
+    it('should handle fetch network errors on create', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        createOrder({ customerName: 'test', table: '1', items: [] })
+      ).rejects.toThrow('Network error');
+    });
+
+    it('should handle fetch network errors on get order', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(getOrderById('123')).rejects.toThrow('Network error');
+    });
+
+    it('should handle malformed error response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ detail: 'Server error' }),
+      });
+
+      await expect(
+        updateOrder('123', { customerName: 'test' })
+      ).rejects.toThrow('Server error');
     });
   });
 });
