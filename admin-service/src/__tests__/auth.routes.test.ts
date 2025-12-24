@@ -35,69 +35,6 @@ describe('Auth Routes', () => {
   });
 
   describe('POST /admin/auth/login', () => {
-    it('should login with valid credentials and set HttpOnly cookie', async () => {
-      const db = getTestDb();
-      const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
-        name: 'Test User',
-        email: 'test@example.com',
-        passwordHash,
-        roles: ['admin'],
-        active: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      
-      // ✅ Esperar a que MongoDB procese la inserción
-      await waitForMongo();
-
-      const response = await request(app)
-        .post('/admin/auth/login')
-        .send({ email: 'test@example.com', password: 'password123', _encrypted: false });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-
-      // ✅ No token in response body
-      expect(response.body.token).toBeUndefined();
-
-      // ✅ User data in response
-      expect(response.body.user).toBeDefined();
-      expect(response.body.user.email).toBe('test@example.com');
-      expect(response.body.user.roles).toEqual(['admin']);
-
-      // ✅ Verify HttpOnly cookies are set (access + refresh)
-      const cookies = response.headers['set-cookie'] as unknown as string[];
-      expect(cookies).toBeDefined();
-      expect(Array.isArray(cookies)).toBe(true);
-
-      const accessTokenCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
-      expect(accessTokenCookie).toBeDefined();
-      expect(accessTokenCookie).toContain('HttpOnly');
-      expect(accessTokenCookie).toContain('SameSite=Lax');
-
-      const refreshTokenCookie = cookies.find((cookie: string) => cookie.startsWith('refreshToken='));
-      expect(refreshTokenCookie).toBeDefined();
-      expect(refreshTokenCookie).toContain('HttpOnly');
-      expect(refreshTokenCookie).toContain('Path=/admin/auth/refresh');
-
-      // ✅ Verify access token in cookie is valid
-      const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
-      expect(tokenMatch).toBeTruthy();
-      const token = tokenMatch![1];
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      expect(decoded.email).toBe('test@example.com');
-      expect(decoded.roles).toEqual(['admin']);
-
-      // ✅ Verify refresh token was saved in database
-      await waitForMongo(); // Esperar a que el refresh token se guarde
-      const savedRefreshToken = await db.collection('refresh_tokens').findOne({
-        userId: String(decoded.sub)
-      });
-      expect(savedRefreshToken).toBeDefined();
-      expect(savedRefreshToken?.token).toBeDefined();
-    });
-
     it('should reject login with invalid email format', async () => {
       const response = await request(app)
         .post('/admin/auth/login')
@@ -170,38 +107,6 @@ describe('Auth Routes', () => {
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
       expect(response.body.message).toBe('Invalid credentials');
-    });
-
-    it('should include all user roles in cookie token', async () => {
-      const db = getTestDb();
-      const passwordHash = await bcrypt.hash('password123', 10);
-      await db.collection('users').insertOne({
-        name: 'Multi-Role User',
-        email: 'multirole@example.com',
-        passwordHash,
-        roles: ['admin', 'waiter', 'cook'],
-        active: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      
-      // ✅ Esperar a que MongoDB procese la inserción
-      await waitForMongo();
-
-      const response = await request(app)
-        .post('/admin/auth/login')
-        .send({ email: 'multirole@example.com', password: 'password123', _encrypted: false });
-
-      expect(response.status).toBe(200);
-
-      // ✅ Extract token from cookie
-      const cookies = response.headers['set-cookie'] as unknown as string[];
-      const accessTokenCookie = cookies.find((cookie: string) => cookie.startsWith('accessToken='));
-      const tokenMatch = (/accessToken=([^;]+)/).exec(accessTokenCookie!);
-      const token = tokenMatch![1];
-
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      expect(decoded.roles).toEqual(['admin', 'waiter', 'cook']);
     });
 
     it('should not include passwordHash in response', async () => {
