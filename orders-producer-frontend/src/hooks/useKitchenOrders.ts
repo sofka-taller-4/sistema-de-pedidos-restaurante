@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getKitchenOrders, updateOrderStatus as updateOrderStatusAPI } from '../services/orderService';
-import type { ApiOrder } from '../types/order';
+import type { ApiOrder, KitchenOrder } from '../types/order';
 import type { OrderStatus } from '../components/KitchenOrderCard';
 
 // Get WebSocket URL from environment variables
@@ -36,7 +36,7 @@ export const formatTime = (isoString: string): string => {
   try {
     const cleanedIso = isoString.substring(0, 19); // Keep only up to seconds: YYYY-MM-DDTHH:mm:ss
     const date = new Date(cleanedIso + 'Z'); // Add Z to indicate UTC
-    if (isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime())) {
       return 'N/A';
     }
     const formatted = date.toLocaleTimeString('es-CO', {
@@ -115,6 +115,34 @@ export const mapApiOrderToKitchenOrder = (order: ApiOrder): KitchenOrder => {
 };
 
 export const useKitchenOrders = () => {
+    // --- Extracción de funciones para evitar anidación profunda ---
+    const updateOrdersWithNew = (newOrder: KitchenOrder) => (prev: KitchenOrder[]) => {
+      const exists = prev.some((o: KitchenOrder) => o.id === newOrder.id);
+      if (exists) {
+        return prev.map((o: KitchenOrder) => (o.id === newOrder.id ? newOrder : o));
+      }
+      // Add new orders at the beginning so they appear first
+      return [newOrder, ...prev];
+    };
+
+    const updateOrdersWithUpdated = (updatedOrder: KitchenOrder) => (prev: KitchenOrder[]) => {
+      const exists = prev.some((o: KitchenOrder) => o.fullId === updatedOrder.fullId);
+      if (exists) {
+        // Update existing order while preserving status if it's more advanced
+        return prev.map((o: KitchenOrder) => {
+          if (o.fullId === updatedOrder.fullId) {
+            const statusRank = { 'Nueva Orden': 0, 'Preparando': 1, 'Listo': 2, 'Finalizada': 3, 'Cancelada': 99 };
+            const existingRank = statusRank[o.status] || 0;
+            const updatedRank = statusRank[updatedOrder.status] || 0;
+            // Keep existing status if more advanced, otherwise use updated
+            return existingRank > updatedRank ? { ...updatedOrder, status: o.status } : updatedOrder;
+          }
+          return o;
+        });
+      }
+      // If order doesn't exist, add it
+      return [updatedOrder, ...prev];
+    };
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -189,36 +217,12 @@ export const useKitchenOrders = () => {
 
             if (msg.type === 'ORDER_NEW' && msg.order) {
               const newOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
-                const exists = prev.some((o: KitchenOrder) => o.id === newOrder.id);
-                if (exists) {
-                  return prev.map((o: KitchenOrder) => (o.id === newOrder.id ? newOrder : o));
-                }
-                // Add new orders at the beginning so they appear first
-                return [newOrder, ...prev];
-              });
+              setOrders(updateOrdersWithNew(newOrder));
             }
 
             if (msg.type === 'ORDER_UPDATED' && msg.order) {
               const updatedOrder = mapApiOrderToKitchenOrder(msg.order);
-              setOrders((prev: KitchenOrder[]) => {
-                const exists = prev.some((o: KitchenOrder) => o.fullId === updatedOrder.fullId);
-                if (exists) {
-                  // Update existing order while preserving status if it's more advanced
-                  return prev.map((o: KitchenOrder) => {
-                    if (o.fullId === updatedOrder.fullId) {
-                      const statusRank = { 'Nueva Orden': 0, 'Preparando': 1, 'Listo': 2, 'Finalizada': 3, 'Cancelada': 99 };
-                      const existingRank = statusRank[o.status] || 0;
-                      const updatedRank = statusRank[updatedOrder.status] || 0;
-                      // Keep existing status if more advanced, otherwise use updated
-                      return existingRank > updatedRank ? { ...updatedOrder, status: o.status } : updatedOrder;
-                    }
-                    return o;
-                  });
-                }
-                // If order doesn't exist, add it
-                return [updatedOrder, ...prev];
-              });
+              setOrders(updateOrdersWithUpdated(updatedOrder));
             }
 
             if (msg.type === 'ORDER_READY' && msg.id) {

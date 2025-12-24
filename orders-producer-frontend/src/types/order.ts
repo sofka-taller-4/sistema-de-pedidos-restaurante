@@ -1,3 +1,22 @@
+// KitchenOrder: usado por la cocina y el frontend
+export interface KitchenOrder {
+  id: string;
+  fullId?: string;
+  customerName: string;
+  time: string;
+  table: string;
+  products: {
+    name: string;
+    quantity: number;
+    price: number;
+    preparationTime?: number;
+  }[];
+  total: number;
+  status: import('../components/KitchenOrderCard').OrderStatus;
+  estimatedPrepTime?: number;
+  prepStartTime?: number;
+  phone?: string;
+}
 export interface Product {
   id: number;
   name: string;
