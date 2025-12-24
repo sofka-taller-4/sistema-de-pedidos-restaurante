@@ -11,6 +11,7 @@ export class UserRepository implements IUserRepository {
       const response = await this.adminProxy.forward(`/admin/users/email/${encodedEmail}`, 'GET');
       return response.data;
     } catch (error) {
+      console.error('Error finding user by email:', error);
       return null;
     }
   }
@@ -20,20 +21,17 @@ export class UserRepository implements IUserRepository {
       const response = await this.adminProxy.forward(`/admin/users/${id}`, 'GET');
       return response.data;
     } catch (error) {
+      console.error('Error finding user by id:', error);
       return null;
     }
   }
 
   async updatePassword(id: string, password: string): Promise<UpdatePasswordResponse> {
-    try {
-      const response = await this.adminProxy.forward(
-        `/admin/users/${id}/password`, 
-        'PUT', 
-        { password }
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await this.adminProxy.forward(
+      `/admin/users/${id}/password`, 
+      'PUT', 
+      { password }
+    );
+    return response.data;
   }
 }

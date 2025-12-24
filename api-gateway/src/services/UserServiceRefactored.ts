@@ -1,4 +1,4 @@
-import { IUserService, User, UpdatePasswordResponse, UserResponse } from '../interfaces/IUserService';
+import { IUserService, UpdatePasswordResponse, UserResponse } from '../interfaces/IUserService';
 import { IUserRepository } from '../interfaces/IUserRepository';
 
 export class UserService implements IUserService {
@@ -14,6 +14,7 @@ export class UserService implements IUserService {
         data: user
       };
     } catch (error) {
+      console.error('Error getting user by email:', error);
       return {
         success: false,
         data: null
@@ -31,6 +32,7 @@ export class UserService implements IUserService {
         data: user
       };
     } catch (error) {
+      console.error('Error getting user by id:', error);
       return {
         success: false,
         data: null
