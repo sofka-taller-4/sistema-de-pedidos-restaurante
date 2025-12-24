@@ -41,10 +41,10 @@ export const calculateTimeElapsed = (createdAt: string): string => {
   try {
     const created = new Date(createdAt);
     const now = new Date();
-    if (isNaN(created.getTime())) return 'N/A';
+    if (Number.isNaN(created.getTime())) return 'N/A';
     const diffMs = now.getTime() - created.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    if (isNaN(diffMins)) return 'N/A';
+    if (Number.isNaN(diffMins)) return 'N/A';
     if (diffMins < 1) return '< 1 min';
     if (diffMins === 1) return '1 min';
     return `${diffMins} min`;
