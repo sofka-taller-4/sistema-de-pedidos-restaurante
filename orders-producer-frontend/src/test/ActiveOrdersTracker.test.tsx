@@ -167,8 +167,7 @@ describe('ActiveOrdersTracker', () => {
         onViewOrder={vi.fn()}
       />
     );
-    // Puedes ajustar según el indicador de loading real
-    // expect(screen.getByTestId('orders-loading')).toBeInTheDocument();
+    expect(screen.getByText('Cargando pedidos...')).toBeInTheDocument();
   });
 
   it('maneja props vacíos sin errores', () => {

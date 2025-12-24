@@ -150,10 +150,13 @@ describe('EditOrderDialog', () => {
           availableProducts={mockProducts}
         />
       );
-        // Usa el aria-label del botón de eliminar Pizza
-        const delPizzaBtn = screen.getByLabelText('eliminar Pizza');
-        fireEvent.click(delPizzaBtn);
-        expect(screen.queryByText('Pizza')).not.toBeNull();
+      // Contar instancias de "Pizza" antes de eliminar
+      const before = screen.getAllByText('Pizza').length;
+      const delPizzaBtn = screen.getByLabelText('eliminar Pizza');
+      fireEvent.click(delPizzaBtn);
+      // Contar instancias de "Pizza" después de eliminar
+      const after = screen.queryAllByText('Pizza').length;
+      expect(after).toBeLessThan(before);
     });
 
     it('permite agregar una nota a un item', () => {

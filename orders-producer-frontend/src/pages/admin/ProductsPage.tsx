@@ -44,7 +44,6 @@ const ProductsPage: React.FC = () => {
     category: '',
     preparationTime: ''
   });
-  //const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     if (!isAuthenticated) return;

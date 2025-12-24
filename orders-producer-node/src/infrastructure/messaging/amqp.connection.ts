@@ -89,16 +89,25 @@ class ConsoleLogger implements ILogger {
 
 class LocalConnectionProvider implements IConnectionProvider {
   getConfig(): IAMQPConfig {
-    return {
+    const config: IAMQPConfig = {
       protocol: process.env.AMQP_LOCAL_PROTOCOL || "amqp",
       hostname: process.env.AMQP_LOCAL_HOST || "localhost",
-      port: Number(process.env.AMQP_LOCAL_PORT) || undefined,
       username: process.env.AMQP_LOCAL_USER || "guest",
       password: process.env.AMQP_LOCAL_PASS || "guest",
       locale: "en_US",
       frameMax: 0,
       heartbeat: 0,
     };
+
+    // Solo incluir port si está definido
+    const port = Number(process.env.AMQP_LOCAL_PORT);
+    if (!isNaN(port) && port > 0) {
+      config.port = port;
+    } else {
+      config.port = 5672; // Default AMQP port
+    }
+
+    return config;
   }
 
   getConnectionType(): "local" {
@@ -108,10 +117,11 @@ class LocalConnectionProvider implements IConnectionProvider {
 
 class CloudConnectionProvider implements IConnectionProvider {
   getConfig(): IAMQPConfig {
+    const port = Number(process.env.AMQP_CLOUD_PORT);
     return {
       protocol: process.env.AMQP_CLOUD_PROTOCOL || "amqps",
       hostname: process.env.AMQP_CLOUD_HOST || "",
-      port: Number(process.env.AMQP_CLOUD_PORT) || 5671,
+      port: !isNaN(port) && port > 0 ? port : 5671,
       username: process.env.AMQP_CLOUD_USER || "",
       password: process.env.AMQP_CLOUD_PASS || "",
       vhost: process.env.AMQP_CLOUD_VHOST || "/",
@@ -129,11 +139,11 @@ class CloudConnectionProvider implements IConnectionProvider {
 
 class ChannelManager implements IChannelManager {
   private channel: amqp.Channel | null = null;
-  private connection: amqp.Connection | null = null;
+  private connection: amqp.ChannelModel | undefined = undefined;
 
   constructor(private readonly logger: ILogger) {}
 
-  setConnection(connection: amqp.Connection): void {
+  setConnection(connection: amqp.ChannelModel): void {
     this.connection = connection;
   }
 
@@ -164,6 +174,16 @@ class ChannelManager implements IChannelManager {
         this.logger.error("❌ Error cerrando canal AMQP:", error);
       }
     }
+  }
+
+  // Método público para acceso interno seguro
+  getChannelIfExists(): amqp.Channel | null {
+    return this.channel;
+  }
+
+  // Testing helper
+  resetChannelForTesting(): void {
+    this.channel = null;
   }
 }
 
@@ -209,7 +229,7 @@ class QueueManager implements IQueueManager {
 // ============================================================================
 
 class RabbitMQConnectionManager implements IConnectionManager {
-  private connection: amqp.Connection | null = null;
+  private connection: amqp.ChannelModel | undefined = undefined;
   private isConnecting: boolean = false;
 
   constructor(
@@ -239,16 +259,16 @@ class RabbitMQConnectionManager implements IConnectionManager {
       // Configurar manejadores de eventos para reconexión
       this.connection.on("error", (error) => {
         this.logger.error("❌ Error en conexión AMQP:", error);
-        this.connection = null;
+        this.connection = undefined;
       });
 
       this.connection.on("close", () => {
         this.logger.log("⚠️  Conexión AMQP cerrada");
-        this.connection = null;
+        this.connection = undefined;
       });
     } catch (error) {
       this.logger.error("❌ Error creando conexión AMQP:", error);
-      this.connection = null;
+      this.connection = undefined;
       throw error;
     } finally {
       this.isConnecting = false;
@@ -261,7 +281,7 @@ class RabbitMQConnectionManager implements IConnectionManager {
 
       if (this.connection) {
         await this.connection.close();
-        this.connection = null;
+        this.connection = undefined;
         this.logger.log("✅ Conexión AMQP desconectada");
       }
     } catch (error) {
@@ -271,7 +291,12 @@ class RabbitMQConnectionManager implements IConnectionManager {
   }
 
   isConnected(): boolean {
-    return this.connection !== null;
+    return this.connection !== undefined;
+  }
+
+  // Método público para acceso al ChannelManager
+  getChannelManager(): ChannelManager {
+    return this.channelManager;
   }
 }
 
@@ -323,8 +348,9 @@ class RabbitMQConnection {
       throw new Error("Failed to initialize AMQP connection");
     }
 
-    const channelManager = this.connectionManager as any;
-    return channelManager.channelManager.getChannel();
+    // Usar método público en lugar de acceso privado
+    const channelManager = this.connectionManager.getChannelManager();
+    return channelManager.getChannel();
   }
 
   async sendToQueue(queue: string, payload: Buffer, opts?: amqp.Options.Publish): Promise<void> {
@@ -348,8 +374,8 @@ class RabbitMQConnection {
   // Testing helpers
   _resetChannelForTesting(): void {
     if (this.connectionManager) {
-      const channelManager = (this.connectionManager as any).channelManager;
-      channelManager.channel = null;
+      const channelManager = this.connectionManager.getChannelManager();
+      channelManager.resetChannelForTesting();
     }
   }
 
