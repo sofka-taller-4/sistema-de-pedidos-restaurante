@@ -49,13 +49,13 @@ export async function clearDatabase(): Promise<void> {
     await Promise.all(collections.map(c => c.deleteMany({})));
     
     // ✅ ESPERAR MUCHO MÁS para CI (aumentado drásticamente)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
 }
 
 // ✅ Helper para asegurar que las escrituras se completan (aumentado para CI)
 export async function waitForMongo(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise(resolve => setTimeout(resolve, 1000));
 }
 
 export function getTestDb(): Db {
