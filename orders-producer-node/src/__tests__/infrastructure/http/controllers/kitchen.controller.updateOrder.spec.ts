@@ -21,7 +21,7 @@ describe("kitchen.controller - updateOrder", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockRepo = {
       getById: jest.fn(),
       create: jest.fn(),
@@ -217,4 +217,33 @@ describe("kitchen.controller - updateOrder", () => {
     expect(next).toHaveBeenCalledWith(error);
     expect(jsonMock).not.toHaveBeenCalled();
   });
+
+  // ====================================================================
+  // 🔴 FASE RED - TDD: Test para validación de tipo en customerName
+  // ====================================================================
+  it("retorna 400 si customerName no es un string (NoSQL Injection)", async () => {
+    req.params = { id: "ORD-123" };
+    req.body = {
+      customerName: { $ne: null }, // ❌ Objeto malicioso en lugar de string
+      table: "5",
+    };
+
+    await updateOrder(req as Request, res as Response, next);
+
+    // Debe responder 400 Bad Request
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({
+      error: "customerName debe ser una cadena de texto",
+    });
+
+    // NO debe llamar al repositorio
+    expect(mockRepo.getById).not.toHaveBeenCalled();
+    expect(mockRepo.remove).not.toHaveBeenCalled();
+    expect(mockRepo.create).not.toHaveBeenCalled();
+
+    // NO debe notificar a clientes WebSocket
+    const { notifyClients } = require("../../../../infrastructure/websocket/ws-server");
+    expect(notifyClients).not.toHaveBeenCalled();
+  });
+  // ====================================================================
 });

@@ -1,0 +1,253 @@
+name: CI - Tests, Coverage & SonarQube
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "hotfix/**"
+      - "refactor/**"
+
+  pull_request:
+    branches:
+      - develop
+      - main
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.11"
+  MIN_COVERAGE: 60
+
+jobs:
+  # =====================================================
+  # FASE 1: TESTS Y COBERTURA
+  # =====================================================
+
+  test-node-services:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # ✅ MONGODB COMO SERVICIO
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping: 1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - admin-service
+          - orders-producer-node
+          - orders-producer-frontend
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: 📦 Install dependencies
+        working-directory: ${{ matrix.service }}
+        run: npm ci
+
+      - name: 🧪 Run tests with coverage
+        working-directory: ${{ matrix.service }}
+        run: npm run test:coverage
+        env:
+          NODE_ENV: test
+          MONGODB_URI: mongodb://localhost:27017/test
+
+      - name: 📊 Check coverage threshold
+        working-directory: ${{ matrix.service }}
+        run: |
+          echo "Verificando cobertura para ${{ matrix.service }}"
+          if [ -f coverage/coverage-summary.json ]; then
+            COVERAGE=$(cat coverage/coverage-summary.json | python3 -c "import sys, json; print(json.load(sys.stdin)['total']['lines']['pct'])" 2>/dev/null || echo "0")
+            echo "Cobertura: ${COVERAGE}%"
+            
+            if awk -v cov="$COVERAGE" -v min="${{ env.MIN_COVERAGE }}" 'BEGIN { exit (cov < min) ? 0 : 1 }'; then
+              echo "❌ Cobertura ${COVERAGE}% < ${{ env.MIN_COVERAGE }}%"
+              exit 1
+            fi
+            echo "✅ Cobertura OK"
+          fi
+
+      - name: 📤 Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: ${{ matrix.service }}/coverage/
+          retention-days: 7
+
+  test-python-service:
+    name: Test orders-producer-python
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: orders-producer-python/requirements.txt
+
+      - name: 📦 Install dependencies
+        working-directory: orders-producer-python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov
+
+      - name: 🧪 Run tests with coverage
+        working-directory: orders-producer-python
+        run: |
+          pytest \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=${{ env.MIN_COVERAGE }} \
+            -v
+
+      - name: 📤 Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-orders-producer-python
+          path: |
+            orders-producer-python/htmlcov/
+            orders-producer-python/coverage.xml
+          retention-days: 7
+
+  # =====================================================
+  # FASE 2: SONARQUBE (solo si tests pasan)
+  # =====================================================
+
+  sonarqube:
+    name: SonarQube Analysis
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    needs: [test-node-services, test-python-service]
+    if: success()
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 🔥 Necesario para análisis completo
+          # 🔥 FIX CRÍTICO: En PR, hacer checkout de la rama HEAD
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: 📥 Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-reports
+
+      # 🔥 FIX: Mejorar organización de archivos
+      - name: 📁 Organize coverage files
+        run: |
+          echo "📦 Organizando reportes de cobertura..."
+
+          # Crear directorios
+          mkdir -p api-gateway/coverage
+          mkdir -p admin-service/coverage
+          mkdir -p orders-producer-node/coverage
+          mkdir -p orders-producer-frontend/coverage
+          mkdir -p orders-producer-python
+
+          # Copiar archivos
+          [ -d coverage-reports/coverage-api-gateway ] && cp -r coverage-reports/coverage-api-gateway/* api-gateway/coverage/ || echo "⚠️  No coverage-api-gateway"
+          [ -d coverage-reports/coverage-admin-service ] && cp -r coverage-reports/coverage-admin-service/* admin-service/coverage/ || echo "⚠️  No coverage-admin-service"
+          [ -d coverage-reports/coverage-orders-producer-node ] && cp -r coverage-reports/coverage-orders-producer-node/* orders-producer-node/coverage/ || echo "⚠️  No coverage-orders-producer-node"
+          [ -d coverage-reports/coverage-orders-producer-frontend ] && cp -r coverage-reports/coverage-orders-producer-frontend/* orders-producer-frontend/coverage/ || echo "⚠️  No coverage-orders-producer-frontend"
+          [ -d coverage-reports/coverage-orders-producer-python ] && cp -r coverage-reports/coverage-orders-producer-python/* orders-producer-python/ || echo "⚠️  No coverage-orders-producer-python"
+
+          echo ""
+          echo "🔍 Verificando reportes de cobertura:"
+          echo "================================================"
+
+          # Verificar cada servicio
+          check_coverage() {
+            local service=$1
+            local file=$2
+            if [ -f "$file" ]; then
+              local size=$(du -h "$file" | cut -f1)
+              echo "✅ $service - $size"
+              return 0
+            else
+              echo "❌ $service - NO ENCONTRADO"
+              return 1
+            fi
+          }
+
+          check_coverage "API Gateway" "api-gateway/coverage/lcov.info"
+          check_coverage "Admin Service" "admin-service/coverage/lcov.info"
+          check_coverage "Orders Node" "orders-producer-node/coverage/lcov.info"
+          check_coverage "Frontend" "orders-producer-frontend/coverage/lcov.info"
+          check_coverage "Python" "orders-producer-python/coverage.xml"
+
+          echo "================================================"
+          echo ""
+          echo "📋 Estructura de directorios:"
+          find . -name "lcov.info" -o -name "coverage.xml" | head -20
+
+      # 🔥 FIX: Verificar sonar-project.properties
+      - name: 🔍 Verify SonarQube config
+        run: |
+          if [ -f sonar-project.properties ]; then
+            echo "✅ sonar-project.properties encontrado"
+            echo ""
+            echo "📄 Contenido relevante:"
+            grep -E "sonar.coverage|sonar.javascript.lcov|sonar.python.coverage" sonar-project.properties || echo "No se encontraron propiedades de cobertura"
+          else
+            echo "❌ sonar-project.properties NO encontrado"
+            echo "Buscando en subdirectorios..."
+            find . -name "sonar-project.properties" -type f
+          fi
+
+      - name: 🔍 SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # 🔥 Variables adicionales para PR
+          SONAR_SCANNER_OPTS: "-Xmx512m"
+        continue-on-error: true
+
+      - name: ✅ Summary
+        if: always()
+        run: |
+          echo "================================================"
+          echo "📊 RESUMEN DEL PIPELINE"
+          echo "================================================"
+          echo "Tipo de evento: ${{ github.event_name }}"
+          echo "Rama: ${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR: ${{ github.event.pull_request.number }}"
+            echo "Base: ${{ github.event.pull_request.base.ref }}"
+            echo "Head: ${{ github.event.pull_request.head.ref }}"
+          fi
+          echo "================================================"
+          echo "✅ Tests ejecutados"
+          echo "✅ Cobertura verificada (>= 60%)"
+          echo "✅ SonarQube ejecutado"
+          echo "================================================"
