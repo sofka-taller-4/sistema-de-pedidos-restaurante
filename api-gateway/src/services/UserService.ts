@@ -1,33 +1,17 @@
-import { AdminProxyService } from './AdminProxyService';
+import { UserServiceFactory } from '../factories/UserServiceFactory';
 
-const adminProxy = new AdminProxyService();
+// Instancia singleton del servicio refactorizado
+const userService = UserServiceFactory.create();
 
-
+// Funciones de compatibilidad que mantienen la API original
 export async function getUserByEmail(email: string) {
-  try {
-    const res = await adminProxy.forward(`/admin/users/email/${encodeURIComponent(email)}`, 'GET');
-    return res.data;
-  } catch {
-    return null;
-  }
+  return await userService.getUserByEmail(email);
 }
-
 
 export async function getUserById(id: string) {
-  try {
-    const res = await adminProxy.forward(`/admin/users/${id}`, 'GET');
-    return res.data;
-  } catch {
-    return null;
-  }
+  return await userService.getUserById(id);
 }
 
-
 export async function updateUserPassword(id: string, password: string) {
-  try {
-    const res = await adminProxy.forward(`/admin/users/${id}/password`, 'PUT', { password });
-    return res.data;
-  } catch (err) {
-    throw err;
-  }
+  return await userService.updateUserPassword(id, password);
 }
