@@ -1,3 +1,16 @@
+// Helper para construir el documento de usuario
+async function buildUserDoc({ name, email, password, roles, _encrypted }: { name: string, email: string, password: string, roles: string[], _encrypted?: boolean }) {
+  const passwordHash = await processPassword(password, _encrypted);
+  return {
+    name,
+    email,
+    passwordHash,
+    roles,
+    active: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+}
 import { Router } from 'express';
 import { getDb } from '../../../storage/mongo';
 import { requireAuth, requireRole } from '../middlewares/auth';
@@ -11,7 +24,7 @@ export const usersRouter = Router();
 // ✅ Helper para procesar contraseñas (encriptadas o no)
 async function processPassword(password: string, isEncrypted?: boolean): Promise<string> {
   let plainPassword = password;
-  
+
   if (isEncrypted && isEncryptedPassword(password)) {
     try {
       plainPassword = decryptPassword(password);
@@ -19,12 +32,12 @@ async function processPassword(password: string, isEncrypted?: boolean): Promise
       throw new Error('Invalid encrypted password format');
     }
   }
-  
+
   // Validar longitud mínima después de desencriptar
   if (plainPassword.length < 6) {
     throw new Error('Password must be at least 6 characters');
   }
-  
+
   return bcrypt.hash(plainPassword, 10);
 }
 
@@ -33,18 +46,18 @@ async function processPassword(password: string, isEncrypted?: boolean): Promise
 usersRouter.put('/:id/password', async (req, res) => {
   const id = req.params.id;
   const { password, _encrypted } = req.body;
-  
+
   if (!password || typeof password !== 'string') {
     return res.status(400).json({ success: false, message: 'Password is required' });
   }
-  
+
   let objectId;
   try {
     objectId = new ObjectId(id);
   } catch (e) {
     return res.status(400).json({ success: false, message: 'Invalid user ID' });
   }
-  
+
   try {
     const db = getDb();
     const passwordHash = await processPassword(password, _encrypted);
@@ -53,7 +66,7 @@ usersRouter.put('/:id/password', async (req, res) => {
       { $set: { passwordHash, updatedAt: new Date() } }
     );
     if (!result.matchedCount) return res.status(404).json({ success: false, message: 'User not found' });
-    
+
     secureLog.info('🔑 Password updated for user:', { id, encrypted: !!_encrypted });
     return res.json({ success: true, message: 'Password updated' });
   } catch (error) {
@@ -82,20 +95,17 @@ const UpdateUserSchema = z.object({
 usersRouter.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   const parsed = CreateUserSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ success: false, message: 'Invalid payload' });
-  
+
   const { name, email, password, roles, _encrypted } = parsed.data;
-  
   try {
     const db = getDb();
     const exists = await db.collection('users').findOne({ email });
     if (exists) return res.status(409).json({ success: false, message: 'Email already registered' });
-    
-    // ✅ Procesar contraseña (encriptada o no)
-    const passwordHash = await processPassword(password, _encrypted);
-    
-    const doc = { name, email, passwordHash, roles, active: true, createdAt: new Date(), updatedAt: new Date() };
+
+    // Refactor: usar helper para construir el usuario
+    const doc = await buildUserDoc({ name, email, password, roles, _encrypted });
     const result = await db.collection('users').insertOne(doc);
-    
+
     secureLog.info('👤 User created:', { email, roles, encrypted: !!_encrypted });
     return res.status(201).json({ success: true, data: { id: result.insertedId, name, email, roles, active: true } });
   } catch (error) {
@@ -123,7 +133,7 @@ usersRouter.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const id = req.params.id;
   const db = getDb();
   const update: any = { ...parsed.data, updatedAt: new Date() };
-  
+
   // ✅ Procesar contraseña si se proporciona
   if (update.password) {
     try {
@@ -138,13 +148,13 @@ usersRouter.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   } else {
     delete update._encrypted; // Limpiar flag si no hay contraseña
   }
-  
+
   // ✅ Si se está deshabilitando el usuario, revocar todos sus refresh tokens
   if (update.active === false) {
     await db.collection('refresh_tokens').deleteMany({ userId: id });
     console.log('🔒 Revoked all refresh tokens for disabled user:', id);
   }
-  
+
   const result = await db.collection('users').updateOne({ _id: new (await import('mongodb')).ObjectId(id) }, { $set: update });
   if (!result.matchedCount) return res.status(404).json({ success: false, message: 'User not found' });
   return res.json({ success: true, message: 'User updated' });
@@ -169,11 +179,11 @@ usersRouter.patch('/:id/role', requireAuth, requireRole('admin'), async (req, re
 usersRouter.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const id = req.params.id;
   const db = getDb();
-  
+
   // ✅ Revocar todos los refresh tokens del usuario antes de eliminarlo
   await db.collection('refresh_tokens').deleteMany({ userId: id });
   console.log('🔒 Revoked all refresh tokens for deleted user:', id);
-  
+
   const result = await db.collection('users').deleteOne({ _id: new (await import('mongodb')).ObjectId(id) });
   if (!result.deletedCount) return res.status(404).json({ success: false, message: 'User not found' });
   return res.json({ success: true, message: 'User deleted' });
