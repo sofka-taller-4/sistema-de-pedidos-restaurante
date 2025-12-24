@@ -48,9 +48,14 @@ export async function clearDatabase(): Promise<void> {
     const collections = await db.collections();
     await Promise.all(collections.map(c => c.deleteMany({})));
     
-    // ✅ ESPERAR que MongoDB procese las eliminaciones
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // ✅ ESPERAR que MongoDB procese las eliminaciones (aumentado para CI)
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
+}
+
+// ✅ Helper para asegurar que las escrituras se completan
+export async function waitForMongo(): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 50));
 }
 
 export function getTestDb(): Db {

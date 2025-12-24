@@ -31,7 +31,7 @@ jest.mock('../transport/http/middlewares/auth', () => ({
 }));
 
 import { productsRouter } from '../transport/http/routes/products.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 
 jest.mock('../storage/mongo', () => ({
   getDb: () => getTestDb(),
@@ -309,6 +309,7 @@ describe('Products Routes', () => {
         price: 10,
         preparationTime: 10,
       });
+      await waitForMongo();
 
       const token = createAdminToken();
       const response = await request(app)

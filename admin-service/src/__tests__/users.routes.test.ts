@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express from 'express';
 import { usersRouter } from '../transport/http/routes/users.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 // import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { ObjectId } from 'mongodb';
@@ -58,6 +58,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}/password`)
@@ -85,6 +86,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}/password`)
@@ -305,7 +307,7 @@ describe('Users Routes', () => {
         roles: ['waiter'],
         active: true,
         createdAt: new Date()
-      });
+      });      await waitForMongo();      await waitForMongo();
 
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}`)
@@ -329,6 +331,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}`)
@@ -363,8 +366,7 @@ describe('Users Routes', () => {
         roles: ['waiter'],
         active: true,
         createdAt: new Date()
-      });
-
+      });      await waitForMongo();
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}`)
         .send({ name: 'X' }); // Name too short
@@ -387,6 +389,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .patch(`/admin/users/${userId.toString()}/role`)
@@ -412,6 +415,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .patch(`/admin/users/${userId.toString()}/role`)
@@ -432,8 +436,7 @@ describe('Users Routes', () => {
         roles: ['waiter'],
         active: true,
         createdAt: new Date()
-      });
-
+      });      await waitForMongo();
       const response = await request(app)
         .patch(`/admin/users/${userId.toString()}/role`)
         .send({ roles: ['invalid-role'] });

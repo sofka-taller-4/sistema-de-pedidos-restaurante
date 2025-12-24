@@ -2,7 +2,7 @@ import request from 'supertest';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { authRouter } from '../transport/http/routes/auth.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { ObjectId } from 'mongodb';
@@ -47,6 +47,9 @@ describe('Auth Routes', () => {
         createdAt: new Date(),
         updatedAt: new Date()
       });
+      
+      // ✅ Esperar a que MongoDB procese la inserción
+      await waitForMongo();
 
       const response = await request(app)
         .post('/admin/auth/login')
@@ -180,6 +183,9 @@ describe('Auth Routes', () => {
         createdAt: new Date(),
         updatedAt: new Date()
       });
+      
+      // ✅ Esperar a que MongoDB procese la inserción
+      await waitForMongo();
 
       const response = await request(app)
         .post('/admin/auth/login')
