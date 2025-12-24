@@ -1,4 +1,4 @@
-    import {
+import {
       getWebSocketUrl,
       mapApiStatusToOrderStatus,
       formatTime,
@@ -791,5 +791,43 @@ describe('useKitchenOrders', () => {
       await result.current.completeOrder(result.current.orders[0].id);
     });
     expect(result.current.orders[0]?.status).toBe('Finalizada');
+  });
+});
+
+describe('Cobertura extra useKitchenOrders', () => {
+  it('calculatePrepTime retorna 5 si productos es undefined', () => {
+    expect(kitchenOrdersHook.calculatePrepTime(undefined)).toBe(5);
+  });
+  it('calculatePrepTime retorna 5 si productos es null', () => {
+    expect(kitchenOrdersHook.calculatePrepTime(null as any)).toBe(5);
+  });
+  it('calculatePrepTime suma correctamente preparationTime y quantity', () => {
+    const productos = [
+      { preparationTime: 2, quantity: 2 },
+      { preparationTime: 1, quantity: 1 }
+    ];
+    expect(kitchenOrdersHook.calculatePrepTime(productos)).toBe(5);
+  });
+  it('mapApiOrderToKitchenOrder retorna preparationTime 5 si faltan campos', () => {
+    const apiOrder = {
+      id: 'id2',
+      customerName: 'Test',
+      createdAt: new Date().toISOString(),
+      table: '1',
+      status: 'preparing',
+      items: [{ productName: 'A', quantity: 1, unitPrice: 100 }],
+    };
+    const result = kitchenOrdersHook.mapApiOrderToKitchenOrder(apiOrder);
+    expect(result.products[0].preparationTime).toBe(5);
+  });
+  it('formatTime retorna N/A si string no es fecha', () => {
+    expect(kitchenOrdersHook.formatTime('no-fecha')).toBe('N/A');
+  });
+  it('updateOrderStatus retorna array original si no encuentra id', () => {
+    const arr = [{ id: '1', status: 'Preparando' }];
+    expect(kitchenOrdersHook.updateOrderStatus(arr, 'no', 'Listo')).toBe(arr);
+  });
+  it('mapApiStatusToOrderStatus retorna default para status desconocido', () => {
+    expect(kitchenOrdersHook.mapApiStatusToOrderStatus('desconocido')).toBe('Nueva Orden');
   });
 });
