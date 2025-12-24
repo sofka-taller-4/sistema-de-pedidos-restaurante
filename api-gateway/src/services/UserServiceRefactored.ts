@@ -49,7 +49,9 @@ export class UserService implements IUserService {
       throw new Error('Email is required and must be a non-empty string');
     }
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Regex más seguro que evita backtracking catastrófico
+    // Usa una estructura más simple sin grupos anidados que puedan causar ReDoS
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       throw new Error('Invalid email format');
     }
