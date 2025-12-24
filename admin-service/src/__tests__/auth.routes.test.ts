@@ -90,6 +90,7 @@ describe('Auth Routes', () => {
       expect(decoded.roles).toEqual(['admin']);
 
       // ✅ Verify refresh token was saved in database
+      await waitForMongo(); // Esperar a que el refresh token se guarde
       const savedRefreshToken = await db.collection('refresh_tokens').findOne({
         userId: String(decoded.sub)
       });
@@ -215,6 +216,7 @@ describe('Auth Routes', () => {
         createdAt: new Date(),
         updatedAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .post('/admin/auth/login')

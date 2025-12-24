@@ -307,7 +307,8 @@ describe('Users Routes', () => {
         roles: ['waiter'],
         active: true,
         createdAt: new Date()
-      });      await waitForMongo();      await waitForMongo();
+      });
+      await waitForMongo();
 
       const response = await request(app)
         .put(`/admin/users/${userId.toString()}`)
@@ -459,6 +460,7 @@ describe('Users Routes', () => {
         active: true,
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .delete(`/admin/users/${userId.toString()}`);

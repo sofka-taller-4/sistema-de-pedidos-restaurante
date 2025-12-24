@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express, { Express } from 'express';
 import { categoriesRouter } from '../transport/http/routes/categories.routes';
-import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb } from './helpers/testDb';
+import { setupTestDatabase, teardownTestDatabase, clearDatabase, getTestDb, waitForMongo } from './helpers/testDb';
 import { ObjectId } from 'mongodb';
 
 // Mock auth middleware
@@ -58,6 +58,7 @@ describe('Categories Routes', () => {
         name: 'Burgers',
         createdAt: new Date()
       });
+      await waitForMongo();
 
       const response = await request(app)
         .post('/admin/categories')
