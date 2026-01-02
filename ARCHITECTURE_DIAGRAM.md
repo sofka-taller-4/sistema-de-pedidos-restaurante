@@ -28,7 +28,7 @@ graph TB
     subgraph "Python Service - Puerto 8000"
         FastAPI[FastAPI Server<br/>/api/v1/orders/]
         PyService[OrderService<br/>Validación Pydantic]
-        PyRepo[InMemoryRepository]
+        PyRepo[InMemoryRepository<br/>Volátil - solo buffer]
         PyPublisher[RabbitMQ Publisher]
     end
 
@@ -41,7 +41,7 @@ graph TB
         Worker[RabbitMQ Consumer<br/>prefetch=1]
         NodeAPI[Express HTTP API<br/>:3002]
         WSServer[WebSocket Server<br/>:4000]
-        NodeRepo[In-Memory Repository<br/>KitchenOrders]
+        NodeRepo[MongoOrderRepository<br/>Persistente en MongoDB]
         Factory[Order Factory<br/>Strategy Pattern]
     end
 
@@ -52,6 +52,7 @@ graph TB
 
     subgraph "MongoDB - Puerto 27017"
         MongoDB[(MongoDB<br/>orders_db)]
+        OrdersCol[(orders<br/>pedidos de cocina)]
         UsersCol[(users)]
         ProductsCol[(products)]
         CategoriesCol[(categories)]
@@ -87,6 +88,7 @@ graph TB
     Factory --> NodeRepo
     Worker -->|Broadcast| WSServer
     NodeAPI --> NodeRepo
+    NodeRepo -->|Persist orders| OrdersCol
     NodeRepo -->|Read products| ProductsCol
 
     %% Flujo Admin Service
@@ -97,6 +99,7 @@ graph TB
     AdminAPI --> CategoriesCol
 
     %% Conexiones MongoDB
+    MongoDB --> OrdersCol
     MongoDB --> UsersCol
     MongoDB --> ProductsCol
     MongoDB --> CategoriesCol
@@ -115,7 +118,7 @@ graph TB
     class FastAPI,PyService,PyRepo,PyPublisher python
     class Worker,NodeAPI,WSServer,NodeRepo,Factory node
     class Queue,DLQ queue
-    class MongoDB,UsersCol,ProductsCol,CategoriesCol db
+    class MongoDB,OrdersCol,UsersCol,ProductsCol,CategoriesCol db
     class AdminAPI,AdminAuth admin
 ```
 
@@ -140,7 +143,7 @@ sequenceDiagram
     
     Note over P: Valida con Pydantic<br/>Genera UUID + timestamp
     
-    P->>P: Guarda en memoria
+    P->>P: Guarda en InMemoryRepository<br/>(volátil - solo buffer)
     P->>R: Publish a cola 'orders.new'
     P-->>G: 201 Created {order}
     G-->>N: Response
@@ -151,7 +154,7 @@ sequenceDiagram
     R->>W: Consume mensaje (prefetch=1)
     W->>W: Enriquece con tiempos<br/>desde MongoDB
     W->>W: Crea KitchenOrder<br/>(Factory Pattern)
-    W->>W: Guarda en memoria
+    W->>W: Persiste en MongoDB<br/>(collection: orders)
     W->>WS: Broadcast ORDER_NEW
     WS->>K: {type: "ORDER_NEW", order}
     
@@ -168,7 +171,8 @@ sequenceDiagram
     participant N as Nginx:8080
     participant G as API Gateway:3000
     participant NodeAPI as Node API:3002
-    participant Repo as In-Memory Repo
+    participant Repo as MongoOrderRepository
+    participant DB as MongoDB
     participant WS as WebSocket:4000
     participant K2 as Otros Clientes Cocina
 
@@ -176,10 +180,12 @@ sequenceDiagram
     N->>G: Proxy a /api/kitchen/orders/{id}
     G->>NodeAPI: PATCH /kitchen/orders/{id}
     
-    NodeAPI->>Repo: Actualiza estado en memoria
+    NodeAPI->>Repo: updateStatus(id, status)
+    Repo->>DB: UPDATE orders SET status
+    DB-->>Repo: Confirmación
     Repo-->>NodeAPI: Order actualizada
     
-    NodeAPI->>WS: notifyClients({type: "ORDER_READY"})
+    NodeAPI->>WS: notifyClients({type: "ORDER_STATUS_CHANGED"})
     NodeAPI-->>G: 200 OK {order}
     G-->>N: Response
     N-->>K: Confirmación
@@ -347,25 +353,77 @@ class FixedTimeStrategy implements PreparationStrategy { }
 **Propósito**: Diferentes algoritmos de cálculo de tiempo intercambiables.
 
 ### 5. **Repository Pattern** (Data Access)
+
+#### **Python Service - InMemoryOrderRepository**
+```python
+# orders-producer-python/app/repositories/order_repository.py
+class InMemoryOrderRepository(OrderRepository):
+    def __init__(self):
+        self._orders = {}  # Diccionario en memoria
+    
+    def add(self, order: OrderMessage) -> None:
+        self._orders[order.id] = order
+    
+    def get(self, order_id: str) -> Optional[OrderMessage]:
+        return self._orders.get(order_id)
+```
+
+**Características:**
+- ✅ **Volátil**: Los datos se pierden al reiniciar el servicio
+- ✅ **Buffer temporal**: Solo para responder GET `/api/v1/orders/{id}` inmediatamente después de crear
+- ✅ **No crítico**: RabbitMQ es la fuente de verdad, no este repositorio
+- ✅ **Stateless**: El Python Service no mantiene estado de negocio
+
+**Justificación**: El Python Service solo necesita validar y publicar. No requiere persistencia porque:
+1. Los pedidos se publican inmediatamente a RabbitMQ
+2. El Node Service se encarga del estado de cocina
+3. Responde consultas GET solo para confirmación inmediata
+
+#### **Node Service - MongoOrderRepository**
 ```typescript
-// Abstracción de acceso a datos
-interface IOrderRepository {
-  getById(id: string): Promise<KitchenOrder | null>;
-  create(order: KitchenOrder): Promise<void>;
-  remove(id: string): Promise<void>;
+// orders-producer-node/src/infrastructure/database/repositories/mongo.order.repository.ts
+export class MongoOrderRepository implements OrderRepository {
+  private collectionName = "orders";
+
+  async create(order: KitchenOrder): Promise<void> {
+    const col = await this.collection();
+    await col.insertOne(order);  // ← Persiste en MongoDB
+  }
+
+  async updateStatus(id: string, status: KitchenOrder["status"]): Promise<boolean> {
+    const col = await this.collection();
+    const res = await col.updateOne({ id }, { $set: { status } });
+    return res.matchedCount > 0;
+  }
 }
 ```
-**Propósito**: Abstrae la lógica de persistencia (memoria, MongoDB, etc.).
 
-### 6. **Publisher-Subscriber** (RabbitMQ)
-- **Publisher**: Python Service publica a `orders.new`
-- **Subscriber**: Node Worker consume de `orders.new`
-- **Propósito**: Comunicación asíncrona y desacoplada entre servicios.
+**Características:**
+- ✅ **Persistente**: Los datos sobreviven a reinicios del servicio
+- ✅ **Collection**: `orders_db.orders`
+- ✅ **Estado de negocio**: Mantiene el estado actual de pedidos de cocina
+- ✅ **Crítico**: Evita pérdida de pedidos activos
 
-### 7. **Observer Pattern** (WebSocket)
-- Múltiples clientes observan cambios en el estado de pedidos
-- Notificación automática cuando ocurren eventos
-- **Propósito**: Actualizaciones en tiempo real sin polling.
+**Justificación**: El Node Service necesita persistencia porque:
+1. Los pedidos de cocina tienen ciclo de vida largo (pending → preparing → ready)
+2. Un reinicio del servicio no debe perder pedidos activos
+3. Permite trazabilidad y consultas históricas
+4. La cocina depende de este estado para su operación
+
+**Propósito General**: Abstrae la lógica de persistencia permitiendo diferentes implementaciones según necesidades del servicio.
+
+---
+
+#### 📊 Comparación de Repositorios
+
+| Aspecto | Python - InMemory | Node - MongoDB |
+|---------|------------------|----------------|
+| **Persistencia** | ❌ Volátil | ✅ Persistente |
+| **Propósito** | Buffer temporal | Estado de negocio |
+| **Crítico** | ❌ No | ✅ Sí |
+| **Collection** | N/A | `orders` |
+| **Sobrevive reinicio** | ❌ No | ✅ Sí |
+| **Justificación** | Solo validar/publicar | Mantener estado de cocina |
 
 ---
 
@@ -523,7 +581,49 @@ ws.onmessage = (event) => console.log(JSON.parse(event.data));
 **Causa**: JWT_SECRET diferente entre servicios  
 **Solución**: Asegurar mismo `JWT_SECRET` en api-gateway y admin-service
 
+### Problema: Pedidos se pierden al reiniciar Node Service
+**Causa**: Esto NO debería pasar - el sistema usa MongoDB para persistencia  
+**Solución**: Verificar que `USE_MONGO=true` y `MONGO_URI` estén configurados correctamente
+
+---
+
+## 📜 Evolución del Sistema - Migración de Persistencia
+
+### Historia de la Arquitectura
+
+**Versión Inicial (Documentada)**:
+- Python Service: InMemoryRepository ✅
+- Node Service: InMemoryRepository ❌ (documentado pero nunca implementado así)
+
+**Versión Actual (Implementada)**:
+- Python Service: InMemoryRepository ✅ (sin cambios)
+- Node Service: MongoOrderRepository ✅ (migrado a MongoDB)
+
+### Razón de la Migración
+
+Según `USER_HISTORY.md`:
+> "Migrar la persistencia de pedidos desde memoria a MongoDB para garantizar persistencia, escalabilidad y trazabilidad."
+
+**Beneficios logrados:**
+1. ✅ **Persistencia**: Pedidos no se pierden en reinicios
+2. ✅ **Escalabilidad**: Múltiples instancias pueden compartir estado
+3. ✅ **Trazabilidad**: Histórico completo de pedidos
+4. ✅ **Confiabilidad**: Estado de cocina siempre disponible
+
+**Trade-offs aceptados:**
+- Mayor complejidad de infraestructura (requiere MongoDB)
+- Latencia ligeramente mayor (I/O de disco vs memoria)
+- Dependencia adicional en el stack
+
+### Actualización de Documentación (2 enero 2026)
+
+Esta documentación ha sido actualizada para reflejar la implementación real del sistema:
+- ✅ `.github/copilot-instructions.md` - Corregido
+- ✅ `AGENTS.md` - Corregido
+- ✅ `ARCHITECTURE_DIAGRAM.md` - Corregido con detalles completos
+
 ---
 
 **Última actualización**: 2 de enero de 2026  
-**Versión del sistema**: 1.0.0
+**Versión del sistema**: 1.0.0  
+**Documentación sincronizada con implementación**: ✅

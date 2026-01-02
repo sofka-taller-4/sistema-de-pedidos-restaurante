@@ -44,8 +44,10 @@
 - El API Gateway enruta y unifica todas las llamadas externas.
 
 ## Patrones y Convenciones Clave
-- **Estado en memoria:** El servicio de cocina (Node) mantiene el estado de pedidos solo en memoria (no persistir en DB).
-- **Eventos WebSocket:** `ORDER_NEW`, `ORDER_READY`, `QUEUE_EMPTY` para actualizaciones en tiempo real.
+- **Persistencia de Pedidos:**
+  - **Servicio Python:** Usa `InMemoryOrderRepository` (almacenamiento volátil temporal) solo para responder consultas GET inmediatas. Los pedidos se publican a RabbitMQ como fuente de verdad.
+  - **Servicio Node (Cocina):** Usa `MongoOrderRepository` para persistir el estado de pedidos de cocina en MongoDB (`orders_db` collection `orders`). Esto garantiza que los pedidos activos sobrevivan a reinicios del servicio.
+- **Eventos WebSocket:** `ORDER_NEW`, `ORDER_READY`, `ORDER_UPDATED`, `QUEUE_EMPTY` para actualizaciones en tiempo real.
 - **Variables de entorno:** Todos los servicios usan `.env` o Docker Compose para configuración. Ver README de cada servicio para variables requeridas.
 - **Testing:**
   - API Gateway: Pruebas unitarias/integración en `api-gateway/tests/` usando Jest. Sigue principios FIRST (Fast, Independent, Repeatable, Self-validating, Timely).
@@ -69,7 +71,7 @@
 - `admin-service/src/`: Endpoints admin, integración con MongoDB.
 
 ## Consejos Específicos del Proyecto
-- **No persistir el estado de pedidos de cocina en la base de datos; mantenerlo solo en memoria.**
+- **Persistencia:** El servicio Python usa repositorio en memoria (volátil). El servicio Node persiste pedidos de cocina en MongoDB para garantizar que no se pierdan en reinicios.
 - **Usar siempre el gateway para llamadas API en flujos E2E.**
 - **Seguir los nombres de eventos y payloads definidos en el WebSocket de Node.**
 - **Consultar `QA_REQUERIMIENTOS.md` para requisitos de calidad y funcionalidad.**

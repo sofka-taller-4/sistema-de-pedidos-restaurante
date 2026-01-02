@@ -183,14 +183,14 @@ describe('Componente/Funcionalidad', () => {
 ## Reglas Críticas del Proyecto
 
 **NO HACER:**
-- ❌ Persistir el estado de pedidos de cocina en base de datos (mantener solo en memoria)
+- ❌ Modificar la estrategia de persistencia sin consultar (Python usa in-memory, Node usa MongoDB)
 - ❌ Omitir el API Gateway para llamadas externas (siempre enrutar a través del gateway)
 - ❌ Crear/modificar código sin solicitud explícita del usuario
 - ❌ Hacer suposiciones sobre requisitos - siempre clarificar
 
 **HACER:**
 - ✅ Usar API Gateway para toda comunicación frontend-backend
-- ✅ Seguir nombres de eventos WebSocket: `ORDER_NEW`, `ORDER_READY`, `QUEUE_EMPTY`
+- ✅ Seguir nombres de eventos WebSocket: `ORDER_NEW`, `ORDER_READY`, `ORDER_UPDATED`, `QUEUE_EMPTY`
 - ✅ Usar autenticación JWT para endpoints admin (`Authorization: Bearer <token>`)
 - ✅ Validar entrada con Pydantic (Python) o Zod (Node/Gateway)
 - ✅ Aplicar express-mongo-sanitize para prevención de inyección NoSQL
