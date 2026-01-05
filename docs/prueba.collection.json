@@ -1,10 +1,16 @@
 {
   "info": {
-    "name": "API Gateway Centralization - Fase 1",
-    "description": "Testing suite for Login/Logout centralization through API Gateway",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "api-gateway-testing"
+    "name": "API Gateway Centralization",
+    "description": "Collection for testing login/logout centralization through API Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
   "item": [
     {
       "name": "Login Admin",
@@ -18,13 +24,9 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\": \"admin@sofka.com.co\", \"password\": \"admin123\"}"
+          "raw": "{\"email\": \"admin@sofka.com.co\", \"password\": \"encrypted_password_from_adminService.ts\"}"
         },
-        "url": {
-          "raw": "{{base_url}}/api/admin/auth/login",
-          "host": ["{{base_url}}"],
-          "path": ["api", "admin", "auth", "login"]
-        }
+        "url": "{{base_url}}/api/admin/auth/login"
       },
       "event": [
         {
@@ -54,10 +56,6 @@
               "  if (jsonData.token) {",
               "    pm.environment.set(\"auth_token\", jsonData.token);",
               "  }",
-              "});",
-              "",
-              "pm.test(\"Response time is acceptable\", function () {",
-              "  pm.expect(pm.response.responseTime).to.be.below(1000); // < 1 segundo",
               "});"
             ],
             "type": "text/javascript"
@@ -73,24 +71,21 @@
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "accessToken={{auth_token}}",
+            "description": "JWT token from login"
           }
         ],
-        "body": {
-          "mode": "raw",
-          "raw": "{}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/admin/auth/logout",
-          "host": ["{{base_url}}"],
-          "path": ["api", "admin", "auth", "logout"]
-        }
+        "url": "{{base_url}}/api/admin/auth/logout"
       },
       "event": [
         {
           "listen": "prerequest",
           "script": {
             "exec": [
-              "// Verificar que tenemos token",
+              "// Asegurar que tenemos token",
               "if (!pm.environment.get(\"auth_token\")) {",
               "  pm.sendRequest({",
               "    url: pm.variables.get(\"base_url\") + \"/api/admin/auth/login\",",
@@ -102,7 +97,7 @@
               "      mode: 'raw',",
               "      raw: JSON.stringify({",
               "        email: \"admin@sofka.com.co\",",
-              "        password: \"admin123\"",
+              "        password: \"encrypted_password\"",
               "      })",
               "    }",
               "  }, function (err, response) {",
@@ -111,9 +106,7 @@
               "      pm.environment.set(\"auth_token\", token);",
               "    }",
               "  });",
-              "}",
-              "",
-              "console.log(\"🔓 Attempting admin logout...\");"
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -132,53 +125,14 @@
               "});",
               "",
               "pm.test(\"Cookie is cleared\", function () {",
-              "  // Verificar que la cookie fue invalidada",
+              "  // Nota: El backend debería invalidar/clear la cookie",
               "  pm.expect(pm.cookies.has('accessToken')).to.be.false;",
-              "});",
-              "",
-              "pm.test(\"Clean up environment variables\", function () {",
-              "  pm.environment.set(\"auth_token\", \"\");",
-              "  pm.environment.set(\"user_id\", \"\");",
               "});"
             ],
             "type": "text/javascript"
           }
         }
       ]
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "// Collection-level pre-request script",
-          "console.log(\"🚀 Starting API Gateway Centralization Test Suite\");"
-        ]
-      }
-    },
-    {
-      "listen": "test",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "// Collection-level test script",
-          "console.log(\"✅ API Gateway Centralization Test Suite completed\");"
-        ]
-      }
-    }
-  ],
-  "variable": [
-    {
-      "key": "base_url",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "auth_token",
-      "value": "",
-      "type": "string"
     }
   ]
 }

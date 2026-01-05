@@ -26,11 +26,7 @@
           "mode": "raw",
           "raw": "{\"email\": \"admin@sofka.com.co\", \"password\": \"encrypted_password_from_adminService.ts\"}"
         },
-        "url": {
-          "raw": "{{base_url}}/api/admin/auth/login",
-          "host": ["{{base_url}}"],
-          "path": ["api", "admin", "auth", "login"]
-        }
+        "url": "{{base_url}}/api/admin/auth/login"
       },
       "event": [
         {
@@ -82,11 +78,7 @@
             "description": "JWT token from login"
           }
         ],
-        "url": {
-          "raw": "{{base_url}}/api/admin/auth/logout",
-          "host": ["{{base_url}}"],
-          "path": ["api", "admin", "auth", "logout"]
-        }
+        "url": "{{base_url}}/api/admin/auth/logout"
       },
       "event": [
         {
