@@ -50,6 +50,17 @@ export class AdminController {
 		}
 	};
 
+	logout = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const headers = this.getAuthHeaders(req);
+			const r = await this.proxy.forward('/admin/auth/logout', 'POST', undefined, headers);
+			res.status(HTTP_STATUS.OK).json(r.data);
+		} catch (e) {
+			console.error('❌ Logout error:', e);
+			next(e);
+		}
+	};
+
 	// Users
 	createUser = async (req: Request, res: Response, next: NextFunction) => {
 		try {

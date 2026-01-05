@@ -1,0 +1,184 @@
+{
+  "info": {
+    "name": "API Gateway Centralization - Fase 1",
+    "description": "Testing suite for Login/Logout centralization through API Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "api-gateway-testing"
+  },
+  "item": [
+    {
+      "name": "Login Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@sofka.com.co\", \"password\": \"admin123\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has success field\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('success', true);",
+              "});",
+              "",
+              "pm.test(\"Response has user data\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('user');",
+              "});",
+              "",
+              "pm.test(\"Cookies are set\", function () {",
+              "  pm.expect(pm.cookies.has('accessToken')).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"Set auth_token environment variable\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  if (jsonData.token) {",
+              "    pm.environment.set(\"auth_token\", jsonData.token);",
+              "  }",
+              "});",
+              "",
+              "pm.test(\"Response time is acceptable\", function () {",
+              "  pm.expect(pm.response.responseTime).to.be.below(1000); // < 1 segundo",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logout Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/auth/logout",
+          "host": ["{{base_url}}"],
+          "path": ["api", "admin", "auth", "logout"]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Verificar que tenemos token",
+              "if (!pm.environment.get(\"auth_token\")) {",
+              "  pm.sendRequest({",
+              "    url: pm.variables.get(\"base_url\") + \"/api/admin/auth/login\",",
+              "    method: 'POST',",
+              "    header: {",
+              "      'Content-Type': 'application/json'",
+              "    },",
+              "    body: {",
+              "      mode: 'raw',",
+              "      raw: JSON.stringify({",
+              "        email: \"admin@sofka.com.co\",",
+              "        password: \"admin123\"",
+              "      })",
+              "    }",
+              "  }, function (err, response) {",
+              "    if (!err && response.code === 200) {",
+              "      const token = response.json().token;",
+              "      pm.environment.set(\"auth_token\", token);",
+              "    }",
+              "  });",
+              "}",
+              "",
+              "console.log(\"🔓 Attempting admin logout...\");"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has success field\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('success', true);",
+              "});",
+              "",
+              "pm.test(\"Cookie is cleared\", function () {",
+              "  // Verificar que la cookie fue invalidada",
+              "  pm.expect(pm.cookies.has('accessToken')).to.be.false;",
+              "});",
+              "",
+              "pm.test(\"Clean up environment variables\", function () {",
+              "  pm.environment.set(\"auth_token\", \"\");",
+              "  pm.environment.set(\"user_id\", \"\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request script",
+          "console.log(\"🚀 Starting API Gateway Centralization Test Suite\");"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test script",
+          "console.log(\"✅ API Gateway Centralization Test Suite completed\");"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
