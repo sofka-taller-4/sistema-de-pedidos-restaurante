@@ -42,10 +42,68 @@ export class AdminController {
 			// Security: Do not log request body as it contains credentials
 			console.log('🔗 Proxy baseURL:', this.proxy.getBaseURL());
 			const r = await this.proxy.forward('/admin/auth/login', 'POST', req.body, {});
+			
+			// ✅ CRÍTICO: Reenviar las cookies de autenticación al navegador
+			const setCookieHeaders = r.headers['set-cookie'];
+			if (setCookieHeaders) {
+				if (Array.isArray(setCookieHeaders)) {
+					setCookieHeaders.forEach((cookie: string) => {
+						res.setHeader('Set-Cookie', cookie);
+					});
+				} else {
+					res.setHeader('Set-Cookie', setCookieHeaders);
+				}
+				console.log('✅ Authentication cookies forwarded from admin service');
+			}
+			
 			// Security: Do not log login response as it contains tokens
 			res.status(HTTP_STATUS.OK).json(r.data);
 		} catch (e) {
 			console.error('❌ Login error:', e);
+			next(e);
+		}
+	};
+
+	logout = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			const headers = this.getAuthHeaders(req);
+			const r = await this.proxy.forward('/admin/auth/logout', 'POST', undefined, headers);
+			res.status(HTTP_STATUS.OK).json(r.data);
+		} catch (e) {
+			console.error('❌ Logout error:', e);
+			next(e);
+		}
+	};
+
+	refresh = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			// ✅ Obtener cookies del request
+			const cookies = req.headers.cookie || '';
+			
+			console.log('🔄 Refresh token request received');
+			console.log('🍪 Cookies present:', !!cookies);
+			
+			// ✅ Hacer proxy al admin service pasando las cookies
+			const r = await this.proxy.forward('/admin/auth/refresh', 'POST', undefined, {
+				cookie: cookies  // ✅ Importante: pasar cookies
+			});
+			
+			// ✅ CRÍTICO: Reenviar las cookies de respuesta (nuevo accessToken)
+			const setCookieHeaders = r.headers['set-cookie'];
+			if (setCookieHeaders) {
+				if (Array.isArray(setCookieHeaders)) {
+					setCookieHeaders.forEach((cookie: string) => {
+						res.setHeader('Set-Cookie', cookie);
+					});
+				} else {
+					res.setHeader('Set-Cookie', setCookieHeaders);
+				}
+				console.log('✅ Set-Cookie headers forwarded from admin service');
+			}
+			
+			res.status(HTTP_STATUS.OK).json(r.data);
+		} catch (e: any) {
+			console.error('❌ Refresh error:', e.message);
 			next(e);
 		}
 	};
@@ -155,8 +213,19 @@ export class AdminController {
 		const token = req.cookies?.accessToken;
 		const headers: Record<string, string> = {};
 		
+		// ✅ Logging para debugging
+		console.log('🍪 Extracting auth headers:', {
+			hasCookies: !!req.cookies,
+			hasAccessToken: !!token,
+			allCookies: req.cookies ? Object.keys(req.cookies) : [],
+			url: req.url
+		});
+		
 		if (token) {
 			headers.authorization = `Bearer ${token}`;
+			console.log('✅ Authorization header added');
+		} else {
+			console.warn('⚠️ No accessToken found in cookies for:', req.url);
 		}
 		
 		return headers;

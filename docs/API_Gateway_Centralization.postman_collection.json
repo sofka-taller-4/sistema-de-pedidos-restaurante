@@ -1,0 +1,138 @@
+{
+  "info": {
+    "name": "API Gateway Centralization",
+    "description": "Collection for testing login/logout centralization through API Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Login Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@sofka.com.co\", \"password\": \"encrypted_password_from_adminService.ts\"}"
+        },
+        "url": "{{base_url}}/api/admin/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has success field\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('success', true);",
+              "});",
+              "",
+              "pm.test(\"Response has user data\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('user');",
+              "});",
+              "",
+              "pm.test(\"Cookies are set\", function () {",
+              "  pm.expect(pm.cookies.has('accessToken')).to.be.true;",
+              "});",
+              "",
+              "pm.test(\"Set auth_token environment variable\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  if (jsonData.token) {",
+              "    pm.environment.set(\"auth_token\", jsonData.token);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logout Admin",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "accessToken={{auth_token}}",
+            "description": "JWT token from login"
+          }
+        ],
+        "url": "{{base_url}}/api/admin/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Asegurar que tenemos token",
+              "if (!pm.environment.get(\"auth_token\")) {",
+              "  pm.sendRequest({",
+              "    url: pm.variables.get(\"base_url\") + \"/api/admin/auth/login\",",
+              "    method: 'POST',",
+              "    header: {",
+              "      'Content-Type': 'application/json'",
+              "    },",
+              "    body: {",
+              "      mode: 'raw',",
+              "      raw: JSON.stringify({",
+              "        email: \"admin@sofka.com.co\",",
+              "        password: \"encrypted_password\"",
+              "      })",
+              "    }",
+              "  }, function (err, response) {",
+              "    if (!err && response.code === 200) {",
+              "      const token = response.json().token;",
+              "      pm.environment.set(\"auth_token\", token);",
+              "    }",
+              "  });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has success field\", function () {",
+              "  const jsonData = pm.response.json();",
+              "  pm.expect(jsonData).to.have.property('success', true);",
+              "});",
+              "",
+              "pm.test(\"Cookie is cleared\", function () {",
+              "  // Nota: El backend debería invalidar/clear la cookie",
+              "  pm.expect(pm.cookies.has('accessToken')).to.be.false;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -39,8 +39,6 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    ports:
-      - "8000:8000"
 
   node-ms:
     build:
@@ -62,9 +60,6 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
-    ports:
-      - "3002:3002"
-      - "4000:4000"
 
   api-gateway:
     build:
@@ -84,19 +79,21 @@ services:
     depends_on:
       - python-ms
       - node-ms
-    ports:
-      - "3000:3000"
 
   front:
     build:
       context: ./orders-producer-frontend
+      args:
+        - VITE_API_GATEWAY_URL=http://localhost:5173
+        - VITE_WEBSOCKET_URL=ws://localhost:5173/ws  # ✅ NUEVO: Por Nginx/Gateway
     container_name: front
     depends_on:
       - python-ms
       - node-ms
       - admin-service
+      - api-gateway
     ports:
-      - "5173:5173"
+      - "5173:8080"
 
   admin-service:
     build:
@@ -115,8 +112,6 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-    ports:
-      - "4001:4001"
 
 volumes:
   mongo-data:

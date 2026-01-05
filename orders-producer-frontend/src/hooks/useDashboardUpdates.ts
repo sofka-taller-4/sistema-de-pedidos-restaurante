@@ -29,11 +29,12 @@ export const useDashboardUpdates = (
     try {
       // Get WebSocket URL from environment variables
       const getWebSocketUrl = (): string => {
-        const nodeServiceUrl = import.meta.env.VITE_NODE_MS_URL;
-        if (nodeServiceUrl) {
-          return nodeServiceUrl.replace(/^https?/, nodeServiceUrl.startsWith('https') ? 'wss' : 'ws');
+        const wsUrl = import.meta.env.VITE_WEBSOCKET_URL;
+        if (wsUrl) {
+          return wsUrl;
         }
-        return 'ws://localhost:4000';
+        // Fallback para desarrollo
+        return 'ws://localhost:5173/ws';
       };
       wsRef.current = new WebSocket(getWebSocketUrl());
 

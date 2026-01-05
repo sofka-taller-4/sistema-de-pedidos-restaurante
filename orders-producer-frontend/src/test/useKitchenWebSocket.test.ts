@@ -22,6 +22,31 @@ class GlobalMockWebSocket {
   }
 }
 
+describe('getWebSocketUrl', () => {
+  const originalEnv = import.meta.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    import.meta.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    import.meta.env = originalEnv;
+  });
+
+  it('should use VITE_WEBSOCKET_URL when available', () => {
+    import.meta.env.VITE_WEBSOCKET_URL = 'ws://localhost:3000/ws';
+    const url = kitchenWsHook.getWebSocketUrl();
+    expect(url).toBe('ws://localhost:3000/ws');
+  });
+
+  it('should fallback to default when env var not set', () => {
+    delete import.meta.env.VITE_WEBSOCKET_URL;
+    const url = kitchenWsHook.getWebSocketUrl();
+    expect(url).toBe('ws://localhost:3000/ws');
+  });
+});
+
 describe('Cobertura avanzada useKitchenWebSocket', () => {
   beforeEach(() => {
     (global as any).WebSocket = GlobalMockWebSocket;
@@ -31,11 +56,6 @@ describe('Cobertura avanzada useKitchenWebSocket', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
-  });
-
-  it('getWebSocketUrl retorna fallback si no hay env', () => {
-    expect(typeof kitchenWsHook).toBe('object');
-    expect(typeof kitchenWsHook['useKitchenWebSocket']).toBe('function');
   });
 
   it('mapOrderToPedido cubre todos los branches', () => {

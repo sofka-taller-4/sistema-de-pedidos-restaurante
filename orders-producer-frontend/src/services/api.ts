@@ -24,7 +24,7 @@ api.interceptors.response.use(
         console.log('🔄 Access token expired, attempting refresh...');
         
         // Try to refresh the token
-        await axios.post(`${API_BASE_URL}/admin/auth/refresh`, {}, {
+        await axios.post(`${API_BASE_URL}/api/admin/auth/refresh`, {}, {
           withCredentials: true
         });
         

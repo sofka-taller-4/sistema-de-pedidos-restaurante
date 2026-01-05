@@ -2,15 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import type { Pedido, KitchenOrderMessage, ProductoItem, ApiOrder } from '../types/order';
 import { getKitchenOrders } from '../services/orderService';
 
-// Get WebSocket URL from environment variables
+// DESPUÉS (✅ Por Gateway vía Nginx):
 export const getWebSocketUrl = (): string => {
-  const nodeServiceUrl = import.meta.env.VITE_NODE_MS_URL;
-  if (nodeServiceUrl) {
-    // Convert HTTP(S) URL to WebSocket URL
-    return nodeServiceUrl.replace(/^https?/, nodeServiceUrl.startsWith('https') ? 'wss' : 'ws');
+  const wsUrl = import.meta.env.VITE_WEBSOCKET_URL;
+  if (wsUrl) {
+    return wsUrl;
   }
-  // Fallback to localhost for development
-  return 'ws://localhost:4000';
+  // Fallback para desarrollo
+  return 'ws://localhost:5173/ws';
 };
 
 // Helper: mapea el JSON del MS de cocina a la estructura de la tarjeta

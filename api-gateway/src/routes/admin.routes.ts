@@ -9,6 +9,8 @@ const controller = new AdminController(service);
 
 // Login sin protección
 router.post('/auth/login', controller.login);
+router.post('/auth/logout', controller.logout);
+router.post('/auth/refresh', controller.refresh); // ✅ NUEVO: Token refresh endpoint
 
 // Productos activos (público - para meseros)
 router.get('/products/active', controller.listActiveProducts);
