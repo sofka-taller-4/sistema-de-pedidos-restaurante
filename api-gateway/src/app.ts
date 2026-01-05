@@ -10,6 +10,7 @@ import ordersRoutes from './routes/orders.routes';
 import kitchenRoutes from './routes/kitchen.routes';
 import adminRoutes from './routes/admin.routes';
 import authRoutes from './routes/auth.routes';
+import { websocketProxy } from './routes/websocket.routes';
 
 // Configura y retorna la aplicación Express
 export function createApp(): Application {
@@ -36,6 +37,9 @@ export function createApp(): Application {
   app.use('/api/kitchen', kitchenRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/auth', authRoutes);
+
+  // Proxy para WebSocket
+  app.use('/api/ws', websocketProxy);
 
   // Manejo de errores (debe ir al final)
   app.use(errorHandler);

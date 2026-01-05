@@ -2,13 +2,12 @@ type WebSocketCallback = (data: any) => void;
 
 // Get WebSocket URL from environment variables
 const getWebSocketUrl = (): string => {
-  const nodeServiceUrl = import.meta.env.VITE_NODE_MS_URL;
-  if (nodeServiceUrl) {
-    // Convert HTTP(S) URL to WebSocket URL
-    return nodeServiceUrl.replace(/^https?/, nodeServiceUrl.startsWith('https') ? 'wss' : 'ws');
+  const wsUrl = import.meta.env.VITE_WEBSOCKET_URL;
+  if (wsUrl) {
+    return wsUrl;
   }
-  // Fallback to localhost for development
-  return 'ws://localhost:4000';
+  // Fallback para desarrollo
+  return 'ws://localhost:5173/ws';
 };
 
 class WebSocketService {

@@ -42,6 +42,20 @@ export class AdminController {
 			// Security: Do not log request body as it contains credentials
 			console.log('🔗 Proxy baseURL:', this.proxy.getBaseURL());
 			const r = await this.proxy.forward('/admin/auth/login', 'POST', req.body, {});
+			
+			// ✅ CRÍTICO: Reenviar las cookies de autenticación al navegador
+			const setCookieHeaders = r.headers['set-cookie'];
+			if (setCookieHeaders) {
+				if (Array.isArray(setCookieHeaders)) {
+					setCookieHeaders.forEach((cookie: string) => {
+						res.setHeader('Set-Cookie', cookie);
+					});
+				} else {
+					res.setHeader('Set-Cookie', setCookieHeaders);
+				}
+				console.log('✅ Authentication cookies forwarded from admin service');
+			}
+			
 			// Security: Do not log login response as it contains tokens
 			res.status(HTTP_STATUS.OK).json(r.data);
 		} catch (e) {
@@ -57,6 +71,39 @@ export class AdminController {
 			res.status(HTTP_STATUS.OK).json(r.data);
 		} catch (e) {
 			console.error('❌ Logout error:', e);
+			next(e);
+		}
+	};
+
+	refresh = async (req: Request, res: Response, next: NextFunction) => {
+		try {
+			// ✅ Obtener cookies del request
+			const cookies = req.headers.cookie || '';
+			
+			console.log('🔄 Refresh token request received');
+			console.log('🍪 Cookies present:', !!cookies);
+			
+			// ✅ Hacer proxy al admin service pasando las cookies
+			const r = await this.proxy.forward('/admin/auth/refresh', 'POST', undefined, {
+				cookie: cookies  // ✅ Importante: pasar cookies
+			});
+			
+			// ✅ CRÍTICO: Reenviar las cookies de respuesta (nuevo accessToken)
+			const setCookieHeaders = r.headers['set-cookie'];
+			if (setCookieHeaders) {
+				if (Array.isArray(setCookieHeaders)) {
+					setCookieHeaders.forEach((cookie: string) => {
+						res.setHeader('Set-Cookie', cookie);
+					});
+				} else {
+					res.setHeader('Set-Cookie', setCookieHeaders);
+				}
+				console.log('✅ Set-Cookie headers forwarded from admin service');
+			}
+			
+			res.status(HTTP_STATUS.OK).json(r.data);
+		} catch (e: any) {
+			console.error('❌ Refresh error:', e.message);
 			next(e);
 		}
 	};

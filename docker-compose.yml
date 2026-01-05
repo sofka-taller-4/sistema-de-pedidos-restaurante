@@ -84,8 +84,8 @@ services:
     build:
       context: ./orders-producer-frontend
       args:
-        - VITE_API_GATEWAY_URL=http://localhost:3000
-        - VITE_NODE_MS_URL=http://localhost:4000
+        - VITE_API_GATEWAY_URL=http://localhost:5173
+        - VITE_WEBSOCKET_URL=ws://localhost:5173/ws  # ✅ NUEVO: Por Nginx/Gateway
     container_name: front
     depends_on:
       - python-ms
