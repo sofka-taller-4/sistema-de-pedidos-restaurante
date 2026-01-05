@@ -114,7 +114,8 @@ authRouter.post('/login', async (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax', // ✅ Cambiar de 'strict' a 'lax' para permitir cross-site
-    maxAge: 15 * 60 * 1000 // 15 minutos
+    maxAge: 15 * 60 * 1000, // 15 minutos
+    path: '/'  // ✅ CRÍTICO: Disponible en TODOS los paths
   });
 
   res.cookie('refreshToken', refreshToken, {
@@ -122,7 +123,7 @@ authRouter.post('/login', async (req, res) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax', // ✅ Cambiar de 'strict' a 'lax' para permitir cross-site
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
-    path: '/admin/auth/refresh' // Solo accesible en este endpoint
+    path: '/'  // ✅ CRÍTICO: Disponible en todos los paths
   });
 
   // ✅ NO enviar tokens en body
@@ -188,7 +189,8 @@ authRouter.post('/refresh', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 15 * 60 * 1000
+      maxAge: 15 * 60 * 1000,
+      path: '/'  // ✅ CRÍTICO: Disponible en TODOS los paths
     });
 
     console.log('🔄 Token refreshed for user:', decoded.sub);
@@ -218,7 +220,7 @@ authRouter.post('/logout', async (req, res) => {
     }
   }
 
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken', { path: '/admin/auth/refresh' });
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
   return res.json({ success: true, message: 'Logged out successfully' });
 });

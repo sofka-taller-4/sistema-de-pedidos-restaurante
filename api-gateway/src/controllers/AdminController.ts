@@ -213,8 +213,19 @@ export class AdminController {
 		const token = req.cookies?.accessToken;
 		const headers: Record<string, string> = {};
 		
+		// ✅ Logging para debugging
+		console.log('🍪 Extracting auth headers:', {
+			hasCookies: !!req.cookies,
+			hasAccessToken: !!token,
+			allCookies: req.cookies ? Object.keys(req.cookies) : [],
+			url: req.url
+		});
+		
 		if (token) {
 			headers.authorization = `Bearer ${token}`;
+			console.log('✅ Authorization header added');
+		} else {
+			console.warn('⚠️ No accessToken found in cookies for:', req.url);
 		}
 		
 		return headers;
